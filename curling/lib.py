@@ -54,10 +54,9 @@ class Encoder(json.JSONEncoder):
 
 
 # Serialize using our encoding.
-class Serializer(serialize.JsonSerializer):
+class JsonSerializer(serialize.JsonSerializer):
 
-    def loads(self, data):
-        return json.loads(data, cls=Encoder)
+    key = 'json'
 
     def dumps(self, data):
         return json.dumps(data, cls=Encoder)
@@ -155,24 +154,31 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
                                      'accept': s.get_content_type()})
 
         if 400 <= resp.status_code <= 499:
-            raise exceptions.HttpClientError('Client Error %s: %s' % (resp.status_code, url), response=resp, content=resp.content)
+            raise exceptions.HttpClientError('Client Error %s: %s' %
+                    (resp.status_code, url), response=resp, content=resp.content)
         elif 500 <= resp.status_code <= 599:
-            raise exceptions.HttpServerError('Server Error %s: %s' % (resp.status_code, url), response=resp, content=resp.content)
+            raise exceptions.HttpServerError('Server Error %s: %s' %
+                    (resp.status_code, url), response=resp, content=resp.content)
 
         self._ = resp
 
         return resp
 
 
+def make_serializer(**kw):
+    serial = serialize.Serializer()
+    serial.serializers['json'] = JsonSerializer()
+    kw.setdefault('serializer', serial)
+    return kw
+
+
 class API(TastypieAttributesMixin, SlumberAPI):
 
     def __init__(self, *args, **kw):
-        kw.setdefault('serializer', Serializer())
-        return super(API, self).__init__(*args, **kw)
+        return super(API, self).__init__(*args, **make_serializer(**kw))
 
 
 class MockAPI(MockAttributesMixin, SlumberAPI):
 
     def __init__(self, *args, **kw):
-        kw.setdefault('serializer', Serializer())
-        return super(MockAPI, self).__init__(*args, **kw)
+        return super(MockAPI, self).__init__(*args, **make_serializer(**kw))
