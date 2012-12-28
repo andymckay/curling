@@ -1,3 +1,3 @@
-requests
+requests==0.14.2
 Django
 slumber
