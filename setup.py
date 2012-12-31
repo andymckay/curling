@@ -9,7 +9,7 @@ setup(
     author='Andy McKay',
     author_email='andym@mozilla.com',
     license='BSD',
-    install_requires=['requests', 'slumber', 'Django'],
+    install_requires=['requests', 'slumber', 'Django', 'pygments'],
     packages=['curling'],
     url='https://github.com/andymckay/curling',
     include_package_data=True,
@@ -19,5 +19,10 @@ setup(
         'Natural Language :: English',
         'Operating System :: OS Independent',
         'Framework :: Django'
-    ]
+    ],
+    entry_points={
+        'console_scripts': [
+            'curling = curling.command:main'
+        ]
+    }
 )

@@ -70,6 +70,6 @@ class TestAPI(unittest.TestCase):
     @mock.patch('curling.lib.MockTastypieResource._lookup')
     def test_post_decimal(self, lookup):
         self.api.services.settings.post({
-            'amount': decimal.Decimal(1.0)
+            'amount': decimal.Decimal('1.0')
         })
-        eq_(json.loads(lookup.call_args[1]['data']), {'amount': '1'})
+        eq_(json.loads(lookup.call_args[1]['data']), {u'amount': u'1.0'})
