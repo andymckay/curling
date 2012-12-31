@@ -13,6 +13,15 @@ date_format = '%Y-%m-%d'
 time_format = '%H:%M:%S'
 
 
+# Make slumber 400 errors show the content.
+def verbose(self, *args, **kw):
+    res = super(exceptions.SlumberHttpBaseException, self).__str__(*args, **kw)
+    res += '\nContent: %s\n' % self.content
+    return res
+
+
+exceptions.SlumberHttpBaseException.__str__ = verbose
+
 # Mixins to override the Slumber mixin.
 class TastypieAttributesMixin(object):
 
@@ -154,11 +163,14 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
                                      'accept': s.get_content_type()})
 
         if 400 <= resp.status_code <= 499:
-            raise exceptions.HttpClientError('Client Error %s: %s' %
-                    (resp.status_code, url), response=resp, content=resp.content)
+            raise exceptions.HttpClientError(
+                    'Client Error %s: %s\nContent: %s' %
+                    (resp.status_code, url, resp.content),
+                    response=resp, content=resp.content)
         elif 500 <= resp.status_code <= 599:
             raise exceptions.HttpServerError('Server Error %s: %s' %
-                    (resp.status_code, url), response=resp, content=resp.content)
+                    (resp.status_code, url), response=resp,
+                     content=resp.content)
 
         self._ = resp
 
