@@ -3,13 +3,13 @@ from setuptools import setup
 
 setup(
     name='curling',
-    version='0.1.2',
+    version='0.1.3',
     description='Slumber wrapper for Django that works well with Tastypie',
     long_description=open('README.rst').read(),
     author='Andy McKay',
     author_email='andym@mozilla.com',
     license='BSD',
-    install_requires=['requests', 'slumber', 'Django', 'pygments'],
+    install_requires=['argparse', 'requests', 'slumber', 'Django', 'pygments'],
     packages=['curling'],
     url='https://github.com/andymckay/curling',
     include_package_data=True,

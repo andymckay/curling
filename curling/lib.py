@@ -2,12 +2,13 @@ import json
 import datetime
 import decimal
 
-
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
+import requests
 from slumber import exceptions
 from slumber import Resource, API as SlumberAPI, url_join
 from slumber import serialize
+
 
 date_format = '%Y-%m-%d'
 time_format = '%H:%M:%S'
@@ -184,13 +185,35 @@ def make_serializer(**kw):
     return kw
 
 
-class API(TastypieAttributesMixin, SlumberAPI):
+# Until https://github.com/dstufft/slumber/pull/53 is merged.
+class FixedSerializer(object):
+
+    def __init__(self, base_url=None, auth=None, format=None,
+                 append_slash=True, session=None, serializer=None):
+        if serializer is None:
+            serializer = serialize.Serializer(default=format)
+
+        self._store = {
+            "base_url": base_url,
+            "format": format if format is not None else "json",
+            "append_slash": append_slash,
+            "session": (requests.session(auth=auth)
+                        if session is None else session),
+            "serializer": serializer,
+        }
+
+        # Do some Checks for Required Values
+        if self._store.get("base_url") is None:
+            raise exceptions.ImproperlyConfigured("base_url is required")
+
+
+class API(FixedSerializer, TastypieAttributesMixin, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(API, self).__init__(*args, **make_serializer(**kw))
 
 
-class MockAPI(MockAttributesMixin, SlumberAPI):
+class MockAPI(FixedSerializer, MockAttributesMixin, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(MockAPI, self).__init__(*args, **make_serializer(**kw))
