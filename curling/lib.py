@@ -207,13 +207,13 @@ class FixedSerializer(object):
             raise exceptions.ImproperlyConfigured("base_url is required")
 
 
-class API(FixedSerializer, TastypieAttributesMixin, SlumberAPI):
+class API(TastypieAttributesMixin, FixedSerializer, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(API, self).__init__(*args, **make_serializer(**kw))
 
 
-class MockAPI(FixedSerializer, MockAttributesMixin, SlumberAPI):
+class MockAPI(MockAttributesMixin, FixedSerializer, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(MockAPI, self).__init__(*args, **make_serializer(**kw))
