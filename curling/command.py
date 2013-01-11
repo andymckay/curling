@@ -5,7 +5,11 @@ import tempfile
 import webbrowser
 
 from pygments import highlight
-from pygments.lexers import JSONLexer
+try:
+    from pygments.lexers import JSONLexer as lexer
+except ImportError:
+    from pygments.lexers import JsonLexer as lexer
+
 from pygments.formatters import Terminal256Formatter
 
 import requests
@@ -40,7 +44,7 @@ def main():
     ctype = res.headers['content-type'].split(';')[0]
     if res.content and ctype == 'application/json':
         res = json.dumps(json.loads(res.content), indent=2)
-        out = highlight(res, JSONLexer(), Terminal256Formatter(bg='dark'))
+        out = highlight(res, lexer(), Terminal256Formatter(bg='dark'))
         print out
         return
 
