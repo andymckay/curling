@@ -2,6 +2,7 @@ import json
 import datetime
 import decimal
 
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
 import requests
@@ -89,7 +90,8 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def _try_to_serialize_response(self, resp):
         resp = super(TastypieResource, self)._try_to_serialize_response(resp)
-        if self._is_list(resp):
+        if (getattr(settings, 'CURLING_FORMAT_LISTS', False)
+            and self._is_list(resp)):
             return self._format_list(resp)
         return resp
 
