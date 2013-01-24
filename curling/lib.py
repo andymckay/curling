@@ -95,13 +95,14 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             return self._format_list(resp)
         return resp
 
-    def get(self, data, **kwargs):
+    def get(self, data=None, **kwargs):
         """
         Allow a body in GET, because that's just fine.
         """
         s = self._store['serializer']
 
-        resp = self._request('GET', data=s.dumps(data), params=kwargs)
+        resp = self._request('GET', data=s.dumps(data) if data else None,
+                             params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
         else:
