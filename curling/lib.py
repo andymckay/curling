@@ -18,7 +18,7 @@ time_format = '%H:%M:%S'
 # Make slumber 400 errors show the content.
 def verbose(self, *args, **kw):
     res = super(exceptions.SlumberHttpBaseException, self).__str__(*args, **kw)
-    res += '\nContent: %s\n' % self.content
+    res += '\nContent: %s\n' % getattr(self, 'content', '')
     return res
 
 
@@ -94,6 +94,18 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             and self._is_list(resp)):
             return self._format_list(resp)
         return resp
+
+    def get(self, data, **kwargs):
+        """
+        Allow a body in GET, because that's just fine.
+        """
+        s = self._store['serializer']
+
+        resp = self._request('GET', data=s.dumps(data), params=kwargs)
+        if 200 <= resp.status_code <= 299:
+            return self._try_to_serialize_response(resp)
+        else:
+            return
 
     def get_object(self, **kw):
         """
