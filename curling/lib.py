@@ -75,6 +75,7 @@ class JsonSerializer(serialize.JsonSerializer):
 
 
 class TastypieResource(TastypieAttributesMixin, Resource):
+    format_lists = getattr(settings, 'CURLING_FORMAT_LISTS', False)
 
     def _is_list(self, resp):
         try:
@@ -90,8 +91,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def _try_to_serialize_response(self, resp):
         resp = super(TastypieResource, self)._try_to_serialize_response(resp)
-        if (getattr(settings, 'CURLING_FORMAT_LISTS', False)
-            and self._is_list(resp)):
+        if self.format_lists and self._is_list(resp):
             return self._format_list(resp)
         return resp
 
@@ -114,6 +114,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
         Similar to Django get, but called get_object because get is taken.
         """
+        self.format_lists = True
         res = self.get(**kw)
         if isinstance(res, list):
             if len(res) < 1:
@@ -129,6 +130,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
         Similar to Djangos get_object_or_404.
         """
+        self.format_lists = True
         try:
             return self.get_object(**kw)
         except exceptions.HttpClientError, exc:
@@ -142,6 +144,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
         Similar to Djangos get_list_or_404.
         """
+        self.format_lists = True
         res = self.get(**kw)
         if not res:
             raise ObjectDoesNotExist
