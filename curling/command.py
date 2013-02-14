@@ -14,7 +14,7 @@ from pygments.formatters import Terminal256Formatter
 
 import requests
 
-from lib import Encoder
+from encoder import Encoder
 
 
 def main():
@@ -57,6 +57,7 @@ def main():
         desc, name = tempfile.mkstemp(suffix=mimetypes.guess_extension(ctype))
         open(name, 'w').write(res.content)
         webbrowser.open('file://%s' % name)
+
 
 if __name__=='__main__':
     main()

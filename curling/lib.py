@@ -1,6 +1,4 @@
 import json
-import datetime
-import decimal
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
@@ -10,9 +8,7 @@ from slumber import exceptions
 from slumber import Resource, API as SlumberAPI, url_join
 from slumber import serialize
 
-
-date_format = '%Y-%m-%d'
-time_format = '%H:%M:%S'
+from encoder import Encoder
 
 
 # Make slumber 400 errors show the content.
@@ -21,8 +17,8 @@ def verbose(self, *args, **kw):
     res += '\nContent: %s\n' % getattr(self, 'content', '')
     return res
 
-
 exceptions.SlumberHttpBaseException.__str__ = verbose
+
 
 # Mixins to override the Slumber mixin.
 class TastypieAttributesMixin(object):
@@ -49,21 +45,6 @@ class TastypieList(list):
     pass
 
 
-# An encoder that encodes our stuff the way we want.
-class Encoder(json.JSONEncoder):
-
-    ENCODINGS = {
-        datetime.datetime:
-            lambda v: v.strftime('%s %s' % (date_format, time_format)),
-        datetime.date: lambda v: v.strftime(date_format),
-        datetime.time: lambda v: v.strftime(time_format),
-        decimal.Decimal: str,
-    }
-
-    def default(self, v):
-        return self.ENCODINGS.get(type(v), super(Encoder, self).default)(v)
-
-
 # Serialize using our encoding.
 class JsonSerializer(serialize.JsonSerializer):
 
@@ -71,7 +52,6 @@ class JsonSerializer(serialize.JsonSerializer):
 
     def dumps(self, data):
         return json.dumps(data, cls=Encoder)
-
 
 
 class TastypieResource(TastypieAttributesMixin, Resource):
