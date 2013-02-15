@@ -25,3 +25,8 @@ Will test that one and only one record is returned and access that object.
 
 .. autoclass:: curling.lib.TastypieResource
    :members:
+
+If you've got URLs to items, then *by_url* can be a handy way to access them.
+
+.. autoclass:: curling.lib.CurlingBase
+   :members: by_url

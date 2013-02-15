@@ -9,7 +9,7 @@ setup(
     author='Andy McKay',
     author_email='andym@mozilla.com',
     license='BSD',
-    install_requires=['argparse', 'requests', 'slumber', 'Django', 'pygments'],
+    install_requires=['argparse', 'requests', 'slumber==0.5.3', 'Django', 'pygments'],
     packages=['curling'],
     url='https://github.com/andymckay/curling',
     include_package_data=True,

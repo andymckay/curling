@@ -54,6 +54,20 @@ class JsonSerializer(serialize.JsonSerializer):
         return json.dumps(data, cls=Encoder)
 
 
+def default_parser(url):
+    """
+    A default parser for URLs, you can override this with something different
+    so that by_url gets the right thing, if you'd like to use that.
+
+    This copes with a simple /blah/blah/pk/ scenario and should probably be
+    made more complicated.
+
+    Returns: list of resources, primary key.
+    """
+    split = url.split('/')
+    return split[1:3], split[3] or None
+
+
 class TastypieResource(TastypieAttributesMixin, Resource):
     format_lists = getattr(settings, 'CURLING_FORMAT_LISTS', False)
 
@@ -183,35 +197,36 @@ def make_serializer(**kw):
     return kw
 
 
-# Until https://github.com/dstufft/slumber/pull/53 is merged.
-class FixedSerializer(object):
+class CurlingBase(object):
 
-    def __init__(self, base_url=None, auth=None, format=None,
-                 append_slash=True, session=None, serializer=None):
-        if serializer is None:
-            serializer = serialize.Serializer(default=format)
+    def by_url(self, url, parser=None):
+        """
+        Converts a URL such as:
 
-        self._store = {
-            "base_url": base_url,
-            "format": format if format is not None else "json",
-            "append_slash": append_slash,
-            "session": (requests.session(auth=auth)
-                        if session is None else session),
-            "serializer": serializer,
-        }
+            /generic/transaction/ > generic.transaction
 
-        # Do some Checks for Required Values
-        if self._store.get("base_url") is None:
-            raise exceptions.ImproperlyConfigured("base_url is required")
+        And one such as:
+
+            /generic/transaction/8/ > generic.transaction(8)
+
+        This scheme is assuming that you've got two names and a primary key,
+        if you would like a different parser you could pass in a new one.
+        """
+        parser = parser or default_parser
+        resources, pk = parser(url)
+        current = self
+        for resource in resources:
+            current = getattr(current, resource)
+        return current(pk) if pk else current
 
 
-class API(TastypieAttributesMixin, FixedSerializer, SlumberAPI):
+class API(TastypieAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(API, self).__init__(*args, **make_serializer(**kw))
 
 
-class MockAPI(MockAttributesMixin, FixedSerializer, SlumberAPI):
+class MockAPI(MockAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(MockAPI, self).__init__(*args, **make_serializer(**kw))

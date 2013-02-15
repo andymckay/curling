@@ -1,11 +1,22 @@
 import decimal
 import json
-import lib
 import unittest
+
+from django.conf import settings
+
+minimal = {
+    'DATABASES': {'default': {}},
+    'CURLING_FORMAT_LISTS': True,
+}
+
+if not settings.configured:
+    settings.configure(**minimal)
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
 from nose.tools import eq_, ok_, raises
+
+import lib
 
 # Some samples for the Mock.
 samples = {
@@ -73,3 +84,12 @@ class TestAPI(unittest.TestCase):
             'amount': decimal.Decimal('1.0')
         })
         eq_(json.loads(lookup.call_args[1]['data']), {u'amount': u'1.0'})
+
+    def test_by_url(self):
+        eq_(len(self.api.by_url('/services/settings/').get()), 2)
+        eq_(self.api.by_url('/services/settings/APPEND_SLASH/').get(),
+            {'key': 'APPEND_SLASH'})
+
+    def test_by_url_borked(self):
+        with self.assertRaises(IndexError):
+            self.api.by_url('/')
