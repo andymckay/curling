@@ -35,6 +35,7 @@ samples = {
         'objects': []
     }
 }
+
 lib.mock_lookup = samples
 
 

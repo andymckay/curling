@@ -3,7 +3,7 @@ import json
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
-import requests
+from slumber.exceptions import HttpClientError, HttpServerError
 from slumber import exceptions
 from slumber import Resource, API as SlumberAPI, url_join
 from slumber import serialize
@@ -69,7 +69,14 @@ def default_parser(url):
 
 
 class TastypieResource(TastypieAttributesMixin, Resource):
-    format_lists = getattr(settings, 'CURLING_FORMAT_LISTS', False)
+
+    def __init__(self, *args, **kw):
+        super(TastypieResource, self).__init__(*args, **kw)
+        try:
+            self.format_lists = getattr(settings, 'CURLING_FORMAT_LISTS',
+                                        False)
+        except ImportError:
+            self.format_lists = False
 
     def _is_list(self, resp):
         try:
@@ -144,6 +151,20 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             raise ObjectDoesNotExist
         return res
 
+    def _request(self, method, data=None, params=None):
+        try:
+            super(TastypieResource, self)._request(method, data=data,
+                                                   params=params)
+        except (HttpClientError, HttpServerError), exc:
+            try:
+                exc.content = json.loads(exc.content)
+            except ValueError:
+                pass
+
+            # Make sure we raise the original exception, not one from
+            # parsing the JSON.
+            raise exc
+
 
 mock_lookup = {}
 
@@ -186,7 +207,6 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
                      content=resp.content)
 
         self._ = resp
-
         return resp
 
 

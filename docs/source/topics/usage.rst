@@ -30,3 +30,31 @@ If you've got URLs to items, then *by_url* can be a handy way to access them.
 
 .. autoclass:: curling.lib.CurlingBase
    :members: by_url
+
+Errors
+======
+
+Just like slumber any response in the 400 range is treated as HttpClientError.
+We'll also assume that the response body contains JSON and parse that.
+
+So in the example::
+
+    from lib import API, HttpClientError, HttpServerError
+
+    api = API('http://localhost:8001')
+
+    try:
+        api.by_url('/generic/buyer/').post(data={'foo': 'bar', 'uuid': 'asd'})
+    except (HttpClientError, HttpServerError), exc:
+        print type(exc.content), exc.content
+        print type(exc.message), exc.message
+
+You'll get::
+
+    <type 'dict'> {u'uuid': [u'Buyer with this Uuid already exists.']}
+    <type 'str'> Client Error 400: http://localhost:8001/generic/buyer/
+
+* *content*: the body parsed as JSON, if possible
+* *message*: the nice message of the error
+* *response*: the response object, so *response.status_code* will give you the
+  status
