@@ -13,6 +13,7 @@ if not settings.configured:
     settings.configure(**minimal)
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+import jwt
 import mock
 from nose.tools import eq_, ok_, raises
 
@@ -93,3 +94,35 @@ class TestAPI(unittest.TestCase):
 
     def test_by_url_borked(self):
         self.assertRaises(IndexError, self.api.by_url, '/')
+
+
+class TestJWT(unittest.TestCase):
+
+    def setUp(self):
+        self.api = lib.MockAPI('', format='jwt')
+        self.serializer = self.api._serializer('jwt')
+        self.serializer.set_keys('foo', 'bar')
+
+    @mock.patch('curling.lib.MockTastypieResource._lookup')
+    def test_all(self, lookup):
+        self.api.services.settings.post({
+            'amount': decimal.Decimal('1.0')
+        })
+        kw = lookup.call_args[1]
+        eq_(kw['headers']['content-type'], 'application/jwt')
+        data = jwt.decode(kw['data'], verify=False)
+        eq_(data['amount'], '1.0')
+        eq_(data['jwt-encode-key'], 'foo')
+
+    def test_serializer(self):
+        eq_(self.serializer.loads(self.serializer.dumps({'foo': 'bar'})),
+            {'foo': 'bar'})
+
+    def test_conflict(self):
+        self.assertRaises(ValueError, self.serializer.dumps,
+                          {'jwt-encode-key': 'bar'})
+
+    def test_not_set(self):
+        self.serializer.set_keys(None, None)
+        self.assertRaises(ValueError, self.serializer.dumps,
+                          {'jwt-encode-key': 'bar'})

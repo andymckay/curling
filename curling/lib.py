@@ -1,4 +1,5 @@
 import json
+import jwt
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
@@ -54,6 +55,34 @@ class JsonSerializer(serialize.JsonSerializer):
         return json.dumps(data, cls=Encoder)
 
 
+class JWTSerializer(serialize.JsonSerializer):
+
+    key = 'jwt'
+    content_types = ['application/jwt']
+
+    def __init__(self, *args, **kw):
+        super(JWTSerializer, self).__init__()
+        self.key, self.secret = kw.pop('jwt', (None, None))
+
+    def dumps(self, data):
+        if not self.key or not self.secret:
+            raise ValueError('JWT key and secret not set')
+        if 'jwt-encode-key' in data:
+            raise ValueError('jwt-encode-key already exists in data')
+
+        data['jwt-encode-key'] = self.key
+        return jwt.encode(data, self.secret, encoder=Encoder)
+
+    def loads(self, data):
+        result = jwt.decode(data, self.secret, verify=True)
+        assert result['jwt-encode-key'] == self.key
+        del result['jwt-encode-key']
+        return result
+
+    def set_keys(self, *args):
+        self.key, self.secret = args
+
+
 def default_parser(url):
     """
     A default parser for URLs, you can override this with something different
@@ -73,6 +102,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
     def __init__(self, *args, **kw):
         super(TastypieResource, self).__init__(*args, **kw)
         try:
+            # TODO (andy): remove this from here.
             self.format_lists = getattr(settings, 'CURLING_FORMAT_LISTS',
                                         False)
         except ImportError:
@@ -157,7 +187,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
                                                    params=params)
         except (HttpClientError, HttpServerError), exc:
             try:
-                exc.content = json.loads(exc.content)
+                exc.content = self._try_to_serialize_response(exc.response)
             except ValueError:
                 pass
 
@@ -211,8 +241,9 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
 
 
 def make_serializer(**kw):
-    serial = serialize.Serializer()
+    serial = serialize.Serializer(default=kw.get('format', None))
     serial.serializers['json'] = JsonSerializer()
+    serial.serializers['jwt'] = JWTSerializer(**kw)
     kw.setdefault('serializer', serial)
     return kw
 
@@ -238,6 +269,9 @@ class CurlingBase(object):
         for resource in resources:
             current = getattr(current, resource)
         return current(pk) if pk else current
+
+    def _serializer(self, type):
+        return self._store['serializer'].serializers[type]
 
 
 class API(TastypieAttributesMixin, CurlingBase, SlumberAPI):
