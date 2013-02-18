@@ -92,5 +92,4 @@ class TestAPI(unittest.TestCase):
             {'key': 'APPEND_SLASH'})
 
     def test_by_url_borked(self):
-        with self.assertRaises(IndexError):
-            self.api.by_url('/')
+        self.assertRaises(IndexError, self.api.by_url, '/')
