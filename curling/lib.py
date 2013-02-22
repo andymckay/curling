@@ -183,8 +183,8 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def _request(self, method, data=None, params=None):
         try:
-            super(TastypieResource, self)._request(method, data=data,
-                                                   params=params)
+            return super(TastypieResource, self)._request(method, data=data,
+                                                         params=params)
         except (HttpClientError, HttpServerError), exc:
             try:
                 exc.content = self._try_to_serialize_response(exc.response)
