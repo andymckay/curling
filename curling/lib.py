@@ -1,5 +1,9 @@
 import json
-import jwt
+try:
+    import jwt
+    HAS_JWT = True
+except ImportError:
+    HAS_JWT = False
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
@@ -65,6 +69,9 @@ class JWTSerializer(serialize.JsonSerializer):
         self.key, self.secret = kw.pop('jwt', (None, None))
 
     def dumps(self, data):
+        if not HAS_JWT:
+            raise ImportError('JWT import failed')
+
         if not self.key or not self.secret:
             raise ValueError('JWT key and secret not set')
         if 'jwt-encode-key' in data:
@@ -74,6 +81,9 @@ class JWTSerializer(serialize.JsonSerializer):
         return jwt.encode(data, self.secret, encoder=Encoder)
 
     def loads(self, data):
+        if not HAS_JWT:
+            raise ImportError('JWT import failed')
+
         result = jwt.decode(data, self.secret, verify=True)
         assert result['jwt-encode-key'] == self.key
         del result['jwt-encode-key']
