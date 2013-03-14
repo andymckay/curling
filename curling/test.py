@@ -13,7 +13,6 @@ if not settings.configured:
     settings.configure(**minimal)
 
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
-import jwt
 import mock
 from nose.tools import eq_, ok_, raises
 
@@ -96,33 +95,22 @@ class TestAPI(unittest.TestCase):
         self.assertRaises(IndexError, self.api.by_url, '/')
 
 
-class TestJWT(unittest.TestCase):
+class TestOAuth(unittest.TestCase):
 
     def setUp(self):
-        self.api = lib.MockAPI('', format='jwt')
-        self.serializer = self.api._serializer('jwt')
-        self.serializer.set_keys('foo', 'bar')
+        self.api = lib.MockAPI('http://foo.com')
 
-    @mock.patch('curling.lib.MockTastypieResource._lookup')
-    def test_all(self, lookup):
-        self.api.services.settings.post({
-            'amount': decimal.Decimal('1.0')
-        })
-        kw = lookup.call_args[1]
-        eq_(kw['headers']['content-type'], 'application/jwt')
-        data = jwt.decode(kw['data'], verify=False)
-        eq_(data['amount'], '1.0')
-        eq_(data['jwt-encode-key'], 'foo')
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_none(self, _call_request):
+        self.api.services.settings.get()
+        _call_request.assert_called_with('GET',
+            'http://foo.com/services/settings/', None, {},
+            {'content-type': 'application/json', 'accept': 'application/json'})
 
-    def test_serializer(self):
-        eq_(self.serializer.loads(self.serializer.dumps({'foo': 'bar'})),
-            {'foo': 'bar'})
-
-    def test_conflict(self):
-        self.assertRaises(ValueError, self.serializer.dumps,
-                          {'jwt-encode-key': 'bar'})
-
-    def test_not_set(self):
-        self.serializer.set_keys(None, None)
-        self.assertRaises(ValueError, self.serializer.dumps,
-                          {'jwt-encode-key': 'bar'})
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_some(self, _call_request):
+        self.api.activate_oauth('key', 'secret')
+        self.api.services.settings.get()
+        _call_request.assert_called_with('GET',
+            'http://foo.com/services/settings/', None, {}, mock.ANY)
+        ok_('Authorization' in _call_request.call_args[0][4])

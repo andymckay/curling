@@ -1,10 +1,13 @@
 import json
-import jwt
+import time
 
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+
 import mock
-from slumber.exceptions import HttpClientError, HttpServerError
+import oauth2 as oauth
+
+from slumber.exceptions import HttpClientError, HttpServerError  # NOQA
 from slumber import exceptions
 from slumber import Resource, API as SlumberAPI, url_join
 from slumber import serialize
@@ -12,7 +15,20 @@ from slumber import serialize
 from encoder import Encoder
 
 
-# Make slumber 400 errors show the content.
+def sign_request(method, auth, url):
+    args = {'oauth_consumer_key': auth['key'],
+            'oauth_nonce': oauth.generate_nonce(),
+            'oauth_signature_method': 'HMAC-SHA1',
+            'oauth_timestamp': int(time.time()),
+            'oauth_version': '1.0'}
+
+    req = oauth.Request(method=method, url=url, parameters=args)
+    consumer = oauth.Consumer(auth['key'], auth['secret'])
+    req.sign_request(oauth.SignatureMethod_HMAC_SHA1(), consumer, None)
+    return req.to_header()['Authorization']
+
+
+#Make slumber 400 errors show the content.
 def verbose(self, *args, **kw):
     res = super(exceptions.SlumberHttpBaseException, self).__str__(*args, **kw)
     res += '\nContent: %s\n' % getattr(self, 'content', '')
@@ -53,34 +69,6 @@ class JsonSerializer(serialize.JsonSerializer):
 
     def dumps(self, data):
         return json.dumps(data, cls=Encoder)
-
-
-class JWTSerializer(serialize.JsonSerializer):
-
-    key = 'jwt'
-    content_types = ['application/jwt']
-
-    def __init__(self, *args, **kw):
-        super(JWTSerializer, self).__init__()
-        self.key, self.secret = kw.pop('jwt', (None, None))
-
-    def dumps(self, data):
-        if not self.key or not self.secret:
-            raise ValueError('JWT key and secret not set')
-        if 'jwt-encode-key' in data:
-            raise ValueError('jwt-encode-key already exists in data')
-
-        data['jwt-encode-key'] = self.key
-        return jwt.encode(data, self.secret, encoder=Encoder)
-
-    def loads(self, data):
-        result = jwt.decode(data, self.secret, verify=True)
-        assert result['jwt-encode-key'] == self.key
-        del result['jwt-encode-key']
-        return result
-
-    def set_keys(self, *args):
-        self.key, self.secret = args
 
 
 def default_parser(url):
@@ -181,19 +169,46 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             raise ObjectDoesNotExist
         return res
 
-    def _request(self, method, data=None, params=None):
-        try:
-            return super(TastypieResource, self)._request(method, data=data,
-                                                         params=params)
-        except (HttpClientError, HttpServerError), exc:
-            try:
-                exc.content = self._try_to_serialize_response(exc.response)
-            except ValueError:
-                pass
+    def _call_request(self, method, url, data, params, headers):
+        return self._store["session"].request(method, url, data=data,
+                                              params=params, headers=headers)
 
-            # Make sure we raise the original exception, not one from
-            # parsing the JSON.
-            raise exc
+    def _request(self, method, data=None, params=None, headers=None):
+        """
+        Overwrite so we can pass through custom headers, like oauth
+        or something useful.
+        """
+        s = self._store["serializer"]
+        url = self._store["base_url"]
+
+        if self._store["append_slash"] and not url.endswith("/"):
+            url = url + "/"
+        hdrs = {"accept": s.get_content_type(),
+                "content-type": s.get_content_type()}
+        hdrs.update(headers or {})
+        if 'oauth' in self._store:
+            hdrs['Authorization'] = sign_request(method, self._store['oauth'],
+                                                 url)
+        resp = self._call_request(method, url, data, params, hdrs)
+
+        if 400 <= resp.status_code <= 499:
+            raise exceptions.HttpClientError("Client Error %s: %s" %
+                    (resp.status_code, url), response=resp,
+                    content=self._try_to_serialize_error(resp))
+        elif 500 <= resp.status_code <= 599:
+            raise exceptions.HttpServerError("Server Error %s: %s" %
+                    (resp.status_code, url), response=resp,
+                    content=self._try_to_serialize_error(resp))
+
+        self._ = resp
+
+        return resp
+
+    def _try_to_serialize_error(self, response):
+        try:
+            return self._try_to_serialize_response(response)
+        except ValueError:
+            return response
 
 
 mock_lookup = {}
@@ -215,37 +230,9 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
         resp.status_code = 200
         return resp
 
-    def _request(self, method, data=None, params=None):
-        s = self._store['serializer']
-        url = self._store['base_url']
-
-        if self._store['append_slash'] and not url.endswith("/"):
-            url = url + '/'
-
-        resp = self._lookup(method, url, data=data, params=params,
-                            headers={'content-type': s.get_content_type(),
-                                     'accept': s.get_content_type()})
-
-        if 400 <= resp.status_code <= 499:
-            raise exceptions.HttpClientError(
-                    'Client Error %s: %s\nContent: %s' %
-                    (resp.status_code, url, resp.content),
-                    response=resp, content=resp.content)
-        elif 500 <= resp.status_code <= 599:
-            raise exceptions.HttpServerError('Server Error %s: %s' %
-                    (resp.status_code, url), response=resp,
-                     content=resp.content)
-
-        self._ = resp
-        return resp
-
-
-def make_serializer(**kw):
-    serial = serialize.Serializer(default=kw.get('format', None))
-    serial.serializers['json'] = JsonSerializer()
-    serial.serializers['jwt'] = JWTSerializer(**kw)
-    kw.setdefault('serializer', serial)
-    return kw
+    def _call_request(self, method, url, data, params, headers):
+        return self._lookup(method, url, data=data,
+                            params=params, headers=headers)
 
 
 class CurlingBase(object):
@@ -270,17 +257,17 @@ class CurlingBase(object):
             current = getattr(current, resource)
         return current(pk) if pk else current
 
-    def _serializer(self, type):
-        return self._store['serializer'].serializers[type]
+    def activate_oauth(self, key, secret):
+        self._store['oauth'] = {'key': key, 'secret': secret}
 
 
 class API(TastypieAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
-        return super(API, self).__init__(*args, **make_serializer(**kw))
+        return super(API, self).__init__(*args, **kw)
 
 
 class MockAPI(MockAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
-        return super(MockAPI, self).__init__(*args, **make_serializer(**kw))
+        return super(MockAPI, self).__init__(*args, **kw)

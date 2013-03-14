@@ -59,16 +59,14 @@ You'll get::
 * *response*: the response object, so *response.status_code* will give you the
   status
 
-JWT
-===
+OAuth
+=====
 
-You can send all your data as JWT using the format that
-`solitude https://solitude.readthedocs.org/en/latest/>` likes. To do this you
-need to pass through the format when create the object and ensure that
-you set the keys on the serializer. For example::
+Curling can add in OAuth headers, using OAuth 1.x. These OAuth headers are ones
+that `solitude <https://solitude.readthedocs.org/en/latest/>` can understand,
+so might not implement the complete OAuth spec..
+
+For example::
 
     api = API('http://localhost:8001', format='jwt')
-    api._serializer('jwt').set_keys('key', 'secret')
-
-The communication between the client and server will now be JWT for both
-requests and responses.
+    api.activate_oauth('key', 'secret')

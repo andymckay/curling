@@ -1,5 +1,7 @@
 argparse
+httplib2
 requests==0.14.2
 Django
 slumber
 pygments
+oauth2==1.5.211
