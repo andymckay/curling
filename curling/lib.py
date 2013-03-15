@@ -261,13 +261,20 @@ class CurlingBase(object):
         self._store['oauth'] = {'key': key, 'secret': secret}
 
 
+def make_serializer(**kw):
+    serial = serialize.Serializer(default=kw.get('format', None))
+    serial.serializers['json'] = JsonSerializer()
+    kw.setdefault('serializer', serial)
+    return kw
+
+
 class API(TastypieAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
-        return super(API, self).__init__(*args, **kw)
+        return super(API, self).__init__(*args, **make_serializer(**kw))
 
 
 class MockAPI(MockAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
-        return super(MockAPI, self).__init__(*args, **kw)
+        return super(MockAPI, self).__init__(*args, **make_serializer(**kw))
