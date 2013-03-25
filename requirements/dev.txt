@@ -1,6 +1,7 @@
 argparse
 httplib2
 requests==0.14.2
+mock
 Django
 slumber
 pygments

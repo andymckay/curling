@@ -10,7 +10,7 @@ setup(
     author_email='andym@mozilla.com',
     license='BSD',
     install_requires=['argparse', 'requests', 'PyJWT-mozilla',
-                      'slumber==0.5.3', 'Django', 'pygments',
+                      'mock', 'slumber==0.5.3', 'Django', 'pygments',
                       'oauth2==1.5.211', 'httplib2'],
     packages=['curling'],
     url='https://github.com/andymckay/curling',
