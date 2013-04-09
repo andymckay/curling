@@ -3,6 +3,6 @@ httplib2
 requests==0.14.2
 mock
 Django
-slumber
+slumber==0.5.3
 pygments
 oauth2==1.5.211
