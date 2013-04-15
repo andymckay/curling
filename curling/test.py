@@ -114,3 +114,11 @@ class TestOAuth(unittest.TestCase):
         _call_request.assert_called_with('GET',
             'http://foo.com/services/settings/', None, {}, mock.ANY)
         ok_('Authorization' in _call_request.call_args[0][4])
+
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_query_string(self, _call_request):
+        self.api.activate_oauth('key', 'secret')
+        self.api.services.settings.get(foo='bar')
+        _call_request.assert_called_with('GET',
+            'http://foo.com/services/settings/', None, {'foo': 'bar'},
+            mock.ANY)

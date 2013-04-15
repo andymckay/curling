@@ -15,12 +15,15 @@ from slumber import serialize
 from encoder import Encoder
 
 
-def sign_request(method, auth, url):
+def sign_request(method, auth, url, params):
     args = {'oauth_consumer_key': auth['key'],
             'oauth_nonce': oauth.generate_nonce(),
             'oauth_signature_method': 'HMAC-SHA1',
             'oauth_timestamp': int(time.time()),
             'oauth_version': '1.0'}
+    # Update the signed params with the query string params.
+    if params:
+        args.update(params)
 
     req = oauth.Request(method=method, url=url, parameters=args)
     consumer = oauth.Consumer(auth['key'], auth['secret'])
@@ -188,7 +191,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         hdrs.update(headers or {})
         if 'oauth' in self._store:
             hdrs['Authorization'] = sign_request(method, self._store['oauth'],
-                                                 url)
+                                                 url, params)
         resp = self._call_request(method, url, data, params, hdrs)
 
         if 400 <= resp.status_code <= 499:
