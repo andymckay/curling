@@ -7,6 +7,9 @@ from django.conf import settings
 minimal = {
     'DATABASES': {'default': {}},
     'CURLING_FORMAT_LISTS': True,
+    # Use the toolbar for tests because it handly caches results for us.
+    'STATSD_CLIENT': 'django_statsd.clients.toolbar',
+    'STATSD_PREFIX': None,
 }
 
 if not settings.configured:
@@ -15,8 +18,10 @@ if not settings.configured:
 from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
 from nose.tools import eq_, ok_, raises
+from django_statsd.clients import get_client
 
 import lib
+lib.statsd = get_client()
 
 # Some samples for the Mock.
 samples = {
@@ -122,3 +127,19 @@ class TestOAuth(unittest.TestCase):
         _call_request.assert_called_with('GET',
             'http://foo.com/services/settings/', None, {'foo': 'bar'},
             mock.ANY)
+
+
+class TestStatsd(unittest.TestCase):
+
+    def setUp(self):
+        self.api = lib.MockAPI('http://foo.com')
+        lib.statsd.reset()
+
+    def test_get(self):
+        self.api.services.settings.get()
+        eq_(lib.statsd.cache, {'services.settings.GET.200|count': [[1, 1]]})
+        eq_(len(lib.statsd.timings), 1)
+
+    def test_post(self):
+        self.api.services.settings.post(data={})
+        eq_(lib.statsd.cache, {'services.settings.POST.200|count': [[1, 1]]})

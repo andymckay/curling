@@ -1,8 +1,10 @@
 argparse
-httplib2
-requests==1.2.0
-mock
 Django
-slumber==0.5.3
+django-statsd-mozilla==0.3.8.6
+httplib2
+mock
 pygments
 oauth2==1.5.211
+requests==1.2.0
+slumber==0.5.3
+statsd==1.0.0
