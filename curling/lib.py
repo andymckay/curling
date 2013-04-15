@@ -1,15 +1,18 @@
 import json
 import time
+import urlparse
 
 from django.conf import settings
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 
 import mock
 import oauth2 as oauth
 
+from django_statsd.clients import statsd
+
 from slumber.exceptions import HttpClientError, HttpServerError  # NOQA
 from slumber import exceptions
-from slumber import Resource, API as SlumberAPI, url_join
+from slumber import API as SlumberAPI, Resource, url_join
 from slumber import serialize
 
 from encoder import Encoder
@@ -86,6 +89,13 @@ def default_parser(url):
     """
     split = url.split('/')
     return split[1:3], split[3] or None
+
+
+def _key(url, method):
+    """Produce a standard key for clients like statsd."""
+    return '%s.%s' % (
+        '.'.join([u for u in urlparse.urlparse(url).path.split('/') if u]),
+        method)
 
 
 class TastypieResource(TastypieAttributesMixin, Resource):
@@ -192,8 +202,12 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         if 'oauth' in self._store:
             hdrs['Authorization'] = sign_request(method, self._store['oauth'],
                                                  url, params)
-        resp = self._call_request(method, url, data, params, hdrs)
 
+        stats_key = _key(url, method)
+        with statsd.timer(stats_key):
+            resp = self._call_request(method, url, data, params, hdrs)
+
+        statsd.incr('%s.%s' % (stats_key, resp.status_code))
         if 400 <= resp.status_code <= 499:
             raise exceptions.HttpClientError("Client Error %s: %s" %
                     (resp.status_code, url), response=resp,
