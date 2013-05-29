@@ -276,9 +276,12 @@ class CurlingBase(object):
             current = getattr(current, resource)
         return current(pk) if pk else current
 
-    def activate_oauth(self, key, secret):
+    def _add_callback(self, callback_dict):
         self._store.setdefault('callbacks', [])
-        self._store['callbacks'].append({
+        self._store['callbacks'].append(callback_dict)
+
+    def activate_oauth(self, key, secret):
+        self._add_callback({
             'method': sign_request,
             'extra': {'key': key, 'secret': secret}
         })

@@ -139,8 +139,7 @@ class TestCallable(unittest.TestCase):
         def foo(slumber, headers=None, **kwargs):
             headers['Foo'] = 'bar'
 
-        self.api._store.setdefault('callbacks', [])
-        self.api._store['callbacks'].append({'method': foo})
+        self.api._add_callback({'method': foo})
 
         self.api.services.settings.get()
         ok_('Foo' in _call_request.call_args[0][4])
@@ -150,8 +149,7 @@ class TestCallable(unittest.TestCase):
         def foo(slumber, headers=None, **kwargs):
             ok_(kwargs['extra'], 'boo')
 
-        self.api._store.setdefault('callbacks', [])
-        self.api._store['callbacks'].append({'method': foo, 'extra': 'bar'})
+        self.api._add_callback({'method': foo, 'extra': 'bar'})
         self.api.services.settings.get()
 
 
