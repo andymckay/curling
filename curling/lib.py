@@ -18,8 +18,9 @@ from slumber import serialize
 from encoder import Encoder
 
 
-def sign_request(method, auth, url, params):
-    args = {'oauth_consumer_key': auth['key'],
+def sign_request(slumber, extra=None, headers=None, method=None, params=None,
+                 url=None, **kwargs):
+    args = {'oauth_consumer_key': extra['key'],
             'oauth_nonce': oauth.generate_nonce(),
             'oauth_signature_method': 'HMAC-SHA1',
             'oauth_timestamp': int(time.time()),
@@ -29,9 +30,9 @@ def sign_request(method, auth, url, params):
         args.update(params)
 
     req = oauth.Request(method=method, url=url, parameters=args)
-    consumer = oauth.Consumer(auth['key'], auth['secret'])
+    consumer = oauth.Consumer(extra['key'], extra['secret'])
     req.sign_request(oauth.SignatureMethod_HMAC_SHA1(), consumer, None)
-    return req.to_header()['Authorization']
+    headers['Authorization'] = req.to_header()['Authorization']
 
 
 #Make slumber 400 errors show the content.
@@ -199,9 +200,10 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         hdrs = {"accept": s.get_content_type(),
                 "content-type": s.get_content_type()}
         hdrs.update(headers or {})
-        if 'oauth' in self._store:
-            hdrs['Authorization'] = sign_request(method, self._store['oauth'],
-                                                 url, params)
+        for callback in self._store.get('callbacks', []):
+            callback['method'](self, data=data, extra=callback.get('extra'),
+                               headers=hdrs, method=method, params=params,
+                               url=url)
 
         stats_key = _key(url, method)
         with statsd.timer(stats_key):
@@ -275,7 +277,11 @@ class CurlingBase(object):
         return current(pk) if pk else current
 
     def activate_oauth(self, key, secret):
-        self._store['oauth'] = {'key': key, 'secret': secret}
+        self._store.setdefault('callbacks', [])
+        self._store['callbacks'].append({
+            'method': sign_request,
+            'extra': {'key': key, 'secret': secret}
+        })
 
 
 def make_serializer(**kw):

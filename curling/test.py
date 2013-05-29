@@ -129,6 +129,32 @@ class TestOAuth(unittest.TestCase):
             mock.ANY)
 
 
+class TestCallable(unittest.TestCase):
+
+    def setUp(self):
+        self.api = lib.MockAPI('http://foo.com')
+
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_some(self, _call_request):
+        def foo(slumber, headers=None, **kwargs):
+            headers['Foo'] = 'bar'
+
+        self.api._store.setdefault('callbacks', [])
+        self.api._store['callbacks'].append({'method': foo})
+
+        self.api.services.settings.get()
+        ok_('Foo' in _call_request.call_args[0][4])
+
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_some_extra(self, _call_request):
+        def foo(slumber, headers=None, **kwargs):
+            ok_(kwargs['extra'], 'boo')
+
+        self.api._store.setdefault('callbacks', [])
+        self.api._store['callbacks'].append({'method': foo, 'extra': 'bar'})
+        self.api.services.settings.get()
+
+
 class TestStatsd(unittest.TestCase):
 
     def setUp(self):
