@@ -123,7 +123,10 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         return tpl
 
     def _try_to_serialize_response(self, resp):
+        headers = resp.headers
         resp = super(TastypieResource, self)._try_to_serialize_response(resp)
+        if u'meta' in resp:
+            resp[u'meta'][u'headers'] = headers
         if self.format_lists and self._is_list(resp):
             return self._format_list(resp)
         return resp
@@ -139,6 +142,27 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
         else:
+            return
+
+    def put(self, data, headers=None, **kwargs):
+        s = self._store["serializer"]
+
+        resp = self._request("PUT", data=s.dumps(data),
+                             headers=headers, params=kwargs)
+        if 200 <= resp.status_code <= 299:
+            return self._try_to_serialize_response(resp)
+        else:
+            return False
+
+    def patch(self, data, headers=None, **kwargs):
+        s = self._store["serializer"]
+
+        resp = self._request("PATCH", data=s.dumps(data),
+                             headers=headers, params=kwargs)
+        if 200 <= resp.status_code <= 299:
+            return self._try_to_serialize_response(resp)
+        else:
+            # @@@ Need to be Some sort of Error Here or Something
             return
 
     def get_object(self, **kw):
@@ -245,7 +269,9 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
     def _lookup(self, method, url, data=None, params=None, headers=None):
         resp = mock.Mock()
         resp.headers = {}
-        resp.content = mock_lookup.get('%s:%s' % (method, url), mock.Mock())
+        content = mock.Mock()
+        content.__iter__ = mock.Mock(return_value=iter([]))
+        resp.content = mock_lookup.get('%s:%s' % (method, url), content)
         resp.status_code = 200
         return resp
 
