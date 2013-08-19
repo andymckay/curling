@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='curling',
-    version='0.2.8',
+    version='0.2.9',
     description='Slumber wrapper for Django that works well with Tastypie',
     long_description=open('README.rst').read(),
     author='Andy McKay',

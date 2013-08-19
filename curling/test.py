@@ -167,3 +167,11 @@ class TestStatsd(unittest.TestCase):
     def test_post(self):
         self.api.services.settings.post(data={})
         eq_(lib.statsd.cache, {'services.settings.POST.200|count': [[1, 1]]})
+
+    def test_put(self):
+        self.api.services.settings.put(data={})
+        eq_(lib.statsd.cache, {'services.settings.PUT.200|count': [[1, 1]]})
+
+    def test_patch(self):
+        self.api.services.settings.patch(data={})
+        eq_(lib.statsd.cache, {'services.settings.PATCH.200|count': [[1, 1]]})
