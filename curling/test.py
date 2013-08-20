@@ -164,14 +164,21 @@ class TestStatsd(unittest.TestCase):
         eq_(lib.statsd.cache, {'services.settings.GET.200|count': [[1, 1]]})
         eq_(len(lib.statsd.timings), 1)
 
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_get_with_etag_header(self, _call_request):
+        _call_request.return_value = mock.Mock(status_code=304)
+        self.api.services.settings.get(headers={'If-None-Match': 'etag'})
+        eq_(lib.statsd.cache, {'services.settings.GET.304|count': [[1, 1]]})
+        eq_(len(lib.statsd.timings), 1)
+
     def test_post(self):
-        self.api.services.settings.post(data={})
+        self.api.services.settings.post(data={}, headers={})
         eq_(lib.statsd.cache, {'services.settings.POST.200|count': [[1, 1]]})
 
     def test_put(self):
-        self.api.services.settings.put(data={})
+        self.api.services.settings.put(data={}, headers={})
         eq_(lib.statsd.cache, {'services.settings.PUT.200|count': [[1, 1]]})
 
     def test_patch(self):
-        self.api.services.settings.patch(data={})
+        self.api.services.settings.patch(data={}, headers={})
         eq_(lib.statsd.cache, {'services.settings.PATCH.200|count': [[1, 1]]})
