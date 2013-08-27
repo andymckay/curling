@@ -70,3 +70,10 @@ For example::
 
     api = API('http://localhost:8001', format='jwt')
     api.activate_oauth('key', 'secret')
+
+Headers
+=======
+
+Curling supports optional headers for GET, POST, PUT and PATCH methods.
+If a GET request contains the *If-None-Match* header with a proper Etag,
+a 304 response will be returned with an empty content, as expected.

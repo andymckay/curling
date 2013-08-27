@@ -131,39 +131,52 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             return self._format_list(resp)
         return resp
 
-    def get(self, data=None, **kwargs):
+    def get(self, data=None, headers=None, **kwargs):
         """
         Allow a body in GET, because that's just fine.
         """
         s = self._store['serializer']
 
         resp = self._request('GET', data=s.dumps(data) if data else None,
-                             params=kwargs)
-        if 200 <= resp.status_code <= 299:
-            return self._try_to_serialize_response(resp)
-        else:
-            return
-
-    def put(self, data, headers=None, **kwargs):
-        s = self._store["serializer"]
-
-        resp = self._request("PUT", data=s.dumps(data),
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
+        elif resp.status_code == 304:
+            return resp
         else:
-            return False
+            return
 
-    def patch(self, data, headers=None, **kwargs):
-        s = self._store["serializer"]
+    def post(self, data, headers=None, **kwargs):
+        s = self._store['serializer']
 
-        resp = self._request("PATCH", data=s.dumps(data),
+        resp = self._request('POST', data=s.dumps(data),
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
         else:
             # @@@ Need to be Some sort of Error Here or Something
             return
+
+    def patch(self, data, headers=None, **kwargs):
+        s = self._store['serializer']
+
+        resp = self._request('PATCH', data=s.dumps(data),
+                             headers=headers, params=kwargs)
+        if 200 <= resp.status_code <= 299:
+            return self._try_to_serialize_response(resp)
+        else:
+            # @@@ Need to be Some sort of Error Here or Something
+            return
+
+    def put(self, data, headers=None, **kwargs):
+        s = self._store['serializer']
+
+        resp = self._request('PUT', data=s.dumps(data),
+                             headers=headers, params=kwargs)
+        if 200 <= resp.status_code <= 299:
+            return self._try_to_serialize_response(resp)
+        else:
+            return False
 
     def get_object(self, **kw):
         """
