@@ -24,7 +24,36 @@ options:
 * -h or --help: show help
 * -d or --data: data to be sent, must be valid JSON
 * -X or --request: the verb to be sent, e.g.: curling -X POST to send a POST
-* -i or --include: include the HTTP response headers in the output
+* -i or --include: include the HTTP response headers in the output (legacy
+  only)
+* -l or --legacy: use the old style command (see below)
+
+Legacy
+======
+
+The legacy command just uses the requests library to make requests, not the
+actual curling library. Since that's rather daft, I hope to remove that soon.
+
+Config
+======
+
+This is not available in the legacy code. Curling will use the full curling api
+from the command line and look for a config file:
+
+* called ``.curling`` and located in your current directory
+* called ``.curling`` and located in your home directory
+
+It will assume the file is JSON and try and load it. Then it will look up
+values based on the domain you are trying to access. If ``key`` and ``secret``
+are present, it will enable oAuth for that URL using those values. Example
+config::
+
+   {
+    "marketplace-dev.allizom.org": {
+        "key": "mkt:some:key",
+        "secret": "yup"
+    }
+  }
 
 Output
 ======

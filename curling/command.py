@@ -1,7 +1,10 @@
 import argparse
 import json
 import mimetypes
+import os
+import sys
 import tempfile
+import urlparse
 import webbrowser
 
 from pygments import highlight
@@ -13,27 +16,77 @@ except ImportError:
 from pygments.formatters import Terminal256Formatter
 
 import requests
+from slumber.exceptions import HttpClientError
 
-from encoder import Encoder
+import lib
 
 
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--data', default=None, required=False)
-    parser.add_argument('-X', '--request', default='GET', required=False)
-    parser.add_argument('-i', '--include', action='store_true', required=False)
-    parser.add_argument('url')
+def get_config():
+    for filename in ['.curling', '~/.curling']:
+        full = os.path.expanduser(filename)
+        if os.path.exists(full):
+            return json.load(open(full, 'r'))
 
-    config = parser.parse_args()
+
+def get_domain(domain):
+    return get_config().get(domain)
+
+
+def show(data):
+    res = json.dumps(data, indent=2)
+    out = highlight(res, lexer(), Terminal256Formatter(bg='dark'))
+    print out
+
+
+def show_text(data, content_type='text/plain'):
+    if data:
+        if len(data) < 500:
+            print data
+            return
+
+    if data:
+        ext = mimetypes.guess_extension(content_type)
+        desc, name = tempfile.mkstemp(suffix=ext)
+        open(name, 'w').write(data)
+        webbrowser.open('file://%s' % name)
+
+
+def new(config):
+    url = urlparse.urlparse(config.url)
+    api = lib.API('{0}://{1}'.format(url.scheme, url.netloc))
+
+    local = get_domain(url.netloc)
+    if local:
+        api.activate_oauth(local['key'], local['secret'])
+
+    for path in url.path.split('/'):
+        api = getattr(api, path)
+
+    method = getattr(api, config.request.lower())
+
+    try:
+        res = method()
+    except HttpClientError, err:
+        res = {
+            'status': err.response.status_code,
+            'headers': dict(sorted(err.response.headers.items()))
+        }
+        show(res)
+        sys.exit(1)
+
+    if isinstance(res, dict):
+        show(res)
+    else:
+        show_text(res)
+
+
+def old(config):
     headers = {'Content-Type': 'application/json'}
     try:
         method = getattr(requests, config.request.lower())
     except AttributeError:
         print 'No method: %s' % config.request
         return
-
-    if config.data is not None:
-        config.data = json.dumps(json.loads(config.data), cls=Encoder)
 
     res = method(config.url, data=config.data, headers=headers)
     if config.include:
@@ -43,20 +96,26 @@ def main():
 
     ctype = res.headers['content-type'].split(';')[0]
     if res.content and ctype == 'application/json':
-        res = json.dumps(json.loads(res.content), indent=2)
-        out = highlight(res, lexer(), Terminal256Formatter(bg='dark'))
-        print out
+        show(json.loads(res.content))
         return
 
-    if res.content and ctype == 'text/html':
-        if len(res.content) < 500:
-            print res.content
-            return
+    show_text(res.content, content_type=ctype)
 
-    if res.content:
-        desc, name = tempfile.mkstemp(suffix=mimetypes.guess_extension(ctype))
-        open(name, 'w').write(res.content)
-        webbrowser.open('file://%s' % name)
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--data', default=None, required=False)
+    parser.add_argument('-X', '--request', default='GET', required=False)
+    parser.add_argument('-i', '--include', action='store_true', required=False)
+    parser.add_argument('-l', '--legacy', action='store_true', required=False)
+    parser.add_argument('url')
+
+    config = parser.parse_args()
+    if config.legacy:
+        old(config)
+    else:
+        new(config)
+
 
 
 if __name__=='__main__':
