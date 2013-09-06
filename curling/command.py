@@ -69,7 +69,8 @@ def new(config):
     except HttpClientError, err:
         res = {
             'status': err.response.status_code,
-            'headers': dict(sorted(err.response.headers.items()))
+            'headers': dict(sorted(err.response.headers.items())),
+            'body': err.response.content
         }
         show(res)
         sys.exit(1)
