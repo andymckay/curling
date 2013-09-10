@@ -3,12 +3,17 @@ import time
 import urlparse
 
 from django.conf import settings
-from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
+from django.core.exceptions import (ImproperlyConfigured,
+                                    MultipleObjectsReturned,
+                                    ObjectDoesNotExist)
 
 import mock
 import oauth2 as oauth
 
-from django_statsd.clients import statsd
+try:
+    from django_statsd.clients import statsasdd
+except (ImportError, ImproperlyConfigured):
+    statsd = mock.MagicMock()
 
 from slumber.exceptions import HttpClientError, HttpServerError  # NOQA
 from slumber import exceptions
