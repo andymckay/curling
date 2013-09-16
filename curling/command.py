@@ -22,10 +22,12 @@ import lib
 
 
 def get_config():
+    conf = {}
     for filename in ['.curling', '~/.curling']:
         full = os.path.expanduser(filename)
         if os.path.exists(full):
-            return json.load(open(full, 'r'))
+            conf = json.load(open(full, 'r'))
+    return conf
 
 
 def get_domain(domain):
