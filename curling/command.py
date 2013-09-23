@@ -67,7 +67,7 @@ def new(config):
     method = getattr(api, config.request.lower())
 
     try:
-        res = method()
+        res = method(data=config.data)
     except HttpClientError, err:
         res = {
             'status': err.response.status_code,
