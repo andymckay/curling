@@ -23,6 +23,8 @@ from django_statsd.clients import get_client
 import lib
 lib.statsd = get_client()
 
+from requests.exceptions import ConnectionError
+
 # Some samples for the Mock.
 samples = {
     'GET:/services/settings/APPEND_SLASH/': {
@@ -98,6 +100,12 @@ class TestAPI(unittest.TestCase):
 
     def test_by_url_borked(self):
         self.assertRaises(IndexError, self.api.by_url, '/')
+
+    @raises(lib.HttpServerError)
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_connection_error(self, _call_request):
+        _call_request.side_effect = ConnectionError
+        self.api.services.nothing.get_object()
 
 
 class TestOAuth(unittest.TestCase):

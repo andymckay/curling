@@ -11,9 +11,11 @@ import mock
 import oauth2 as oauth
 
 try:
-    from django_statsd.clients import statsasdd
+    from django_statsd.clients import statsd
 except (ImportError, ImproperlyConfigured):
     statsd = mock.MagicMock()
+
+from requests.exceptions import ConnectionError
 
 from slumber.exceptions import HttpClientError, HttpServerError  # NOQA
 from slumber import exceptions
@@ -213,6 +215,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
                 raise ObjectDoesNotExist
             raise
 
+
     def get_list_or_404(self, **kw):
         """
         Calls get on a list, returns a 404 if the list isn't there.
@@ -249,7 +252,10 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
         stats_key = _key(url, method)
         with statsd.timer(stats_key):
-            resp = self._call_request(method, url, data, params, hdrs)
+            try:
+                resp = self._call_request(method, url, data, params, hdrs)
+            except ConnectionError:
+                raise exceptions.HttpServerError('Connection Error')
 
         statsd.incr('%s.%s' % (stats_key, resp.status_code))
         if 400 <= resp.status_code <= 499:
