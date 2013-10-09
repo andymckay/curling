@@ -84,7 +84,8 @@ def new(config):
 
 
 def old(config):
-    headers = {'Content-Type': 'application/json'}
+    headers = {'Accept': 'application/json',
+               'Content-Type': 'application/json'}
     try:
         method = getattr(requests, config.request.lower())
     except AttributeError:
