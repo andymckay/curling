@@ -28,6 +28,7 @@ from encoder import Encoder
 def sign_request(slumber, extra=None, headers=None, method=None, params=None,
                  url=None, **kwargs):
     args = {'oauth_consumer_key': extra['key'],
+            'oauth_token': 'notimplemented',
             'oauth_nonce': oauth.generate_nonce(),
             'oauth_signature_method': 'HMAC-SHA1',
             'oauth_timestamp': int(time.time()),
