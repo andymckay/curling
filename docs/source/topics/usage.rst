@@ -69,7 +69,7 @@ so might not implement the complete OAuth spec..
 For example::
 
     api = API('http://localhost:8001', format='jwt')
-    api.activate_oauth('key', 'secret')
+    api.activate_oauth('key', 'secret', realm='optional.realm')
 
 Headers
 =======

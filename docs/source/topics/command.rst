@@ -45,15 +45,17 @@ from the command line and look for a config file:
 
 It will assume the file is JSON and try and load it. Then it will look up
 values based on the domain you are trying to access. If ``key`` and ``secret``
-are present, it will enable oAuth for that URL using those values. Example
+are present, it will enable oAuth for that URL using those values. The value
+``realm`` is optional. Example
 config::
 
    {
-    "marketplace-dev.allizom.org": {
-        "key": "mkt:some:key",
-        "secret": "yup"
-    }
-  }
+     "marketplace-dev.allizom.org": {
+       "key": "mkt:some:key",
+       "secret": "yup",
+       "realm": "optional.realm"
+     }
+   }
 
 Output
 ======
