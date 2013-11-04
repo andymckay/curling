@@ -59,7 +59,8 @@ def new(config):
 
     local = get_domain(url.netloc)
     if local:
-        api.activate_oauth(local['key'], local['secret'])
+        api.activate_oauth(local['key'], local['secret'],
+                           realm=local.get('realm', ''))
 
     for path in url.path.split('/'):
         api = getattr(api, path)

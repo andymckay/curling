@@ -40,8 +40,8 @@ def sign_request(slumber, extra=None, headers=None, method=None, params=None,
     req = oauth.Request(method=method, url=url, parameters=args)
     consumer = oauth.Consumer(extra['key'], extra['secret'])
     req.sign_request(oauth.SignatureMethod_HMAC_SHA1(), consumer, None)
-    headers['Authorization'] = req.to_header()['Authorization']
-
+    auth = req.to_header(realm=extra.get('realm', ''))['Authorization']
+    headers['Authorization'] = auth
 
 #Make slumber 400 errors show the content.
 def verbose(self, *args, **kw):
@@ -331,10 +331,10 @@ class CurlingBase(object):
         self._store.setdefault('callbacks', [])
         self._store['callbacks'].append(callback_dict)
 
-    def activate_oauth(self, key, secret):
+    def activate_oauth(self, key, secret, realm=''):
         self._add_callback({
             'method': sign_request,
-            'extra': {'key': key, 'secret': secret}
+            'extra': {'key': key, 'secret': secret, 'realm': realm}
         })
 
 

@@ -126,7 +126,14 @@ class TestOAuth(unittest.TestCase):
         self.api.services.settings.get()
         _call_request.assert_called_with('GET',
             'http://foo.com/services/settings/', None, {}, mock.ANY)
-        ok_('Authorization' in _call_request.call_args[0][4])
+        ok_('OAuth realm=""' in _call_request.call_args[0][4]['Authorization'])
+
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_realm(self, _call_request):
+        self.api.activate_oauth('key', 'secret', realm='r')
+        self.api.services.settings.get()
+        ok_('OAuth realm="r"' in
+            _call_request.call_args[0][4]['Authorization'])
 
     @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_query_string(self, _call_request):
