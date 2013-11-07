@@ -27,6 +27,8 @@ from encoder import Encoder
 
 def sign_request(slumber, extra=None, headers=None, method=None, params=None,
                  url=None, **kwargs):
+    if headers is None:
+        headers = {}
     args = {'oauth_consumer_key': extra['key'],
             'oauth_token': 'notimplemented',
             'oauth_nonce': oauth.generate_nonce(),
