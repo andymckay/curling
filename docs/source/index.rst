@@ -19,6 +19,7 @@ Contents:
    topics/install.rst
    topics/usage.rst
    topics/command.rst
+   topics/developers.rst
 
 Indices and tables
 ==================
