@@ -135,7 +135,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
     def _try_to_serialize_response(self, resp):
         headers = resp.headers
         resp = super(TastypieResource, self)._try_to_serialize_response(resp)
-        if u'meta' in resp:
+        if isinstance(resp, dict) and u'meta' in resp:
             resp[u'meta'][u'headers'] = headers
         if self.format_lists and self._is_list(resp):
             return self._format_list(resp)

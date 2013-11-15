@@ -40,7 +40,9 @@ samples = {
     'GET:/services/nothing/': {
         'meta': {},
         'objects': []
-    }
+    },
+    'GET:/services/fatalerror/':
+        '<meta name="robots" ...><body>really bad</body>',
 }
 
 lib.mock_lookup = samples
@@ -106,6 +108,10 @@ class TestAPI(unittest.TestCase):
     def test_connection_error(self, _call_request):
         _call_request.side_effect = ConnectionError
         self.api.services.nothing.get_object()
+
+    def test_non_dict_is_ignored(self):
+        eq_(self.api.services.fatalerror.get(),
+            samples['GET:/services/fatalerror/'])
 
 
 class TestOAuth(unittest.TestCase):
