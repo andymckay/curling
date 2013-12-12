@@ -30,7 +30,6 @@ def sign_request(slumber, extra=None, headers=None, method=None, params=None,
     if headers is None:
         headers = {}
     args = {'oauth_consumer_key': extra['key'],
-            'oauth_token': 'notimplemented',
             'oauth_nonce': oauth.generate_nonce(),
             'oauth_signature_method': 'HMAC-SHA1',
             'oauth_timestamp': int(time.time()),
@@ -250,8 +249,8 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         hdrs.update(headers or {})
         for callback in self._store.get('callbacks', []):
             callback['method'](self, data=data, extra=callback.get('extra'),
-                               headers=hdrs, method=method, params=params,
-                               url=url)
+                               headers=hdrs, method=method,
+                               params=callback.get('params'), url=url)
 
         stats_key = _key(url, method)
         with statsd.timer(stats_key):
@@ -333,10 +332,11 @@ class CurlingBase(object):
         self._store.setdefault('callbacks', [])
         self._store['callbacks'].append(callback_dict)
 
-    def activate_oauth(self, key, secret, realm=''):
+    def activate_oauth(self, key, secret, realm='', params=None):
         self._add_callback({
             'method': sign_request,
-            'extra': {'key': key, 'secret': secret, 'realm': realm}
+            'extra': {'key': key, 'secret': secret, 'realm': realm},
+            'params': params
         })
 
 
