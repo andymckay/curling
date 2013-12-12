@@ -71,6 +71,12 @@ For example::
     api = API('http://localhost:8001', format='jwt')
     api.activate_oauth('key', 'secret', realm='optional.realm')
 
+You can pass through extra parameters to go through to the oauth generation by
+using passing through `params`, e.g.::
+
+    api.activate_oauth('key', 'secret', realm='optional.realm',
+                       params={'oauth_token': 'foo'})
+
 Headers
 =======
 
