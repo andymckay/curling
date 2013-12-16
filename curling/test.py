@@ -160,6 +160,11 @@ class TestOAuth(unittest.TestCase):
         assert ('oauth_token="f"' in
                 _call_request.call_args[0][-1]['Authorization'])
 
+    @raises(ValueError)
+    def test_merge_conflict(self):
+        self.api.activate_oauth('key', 'secret', params={'oauth_token': 'f'})
+        self.api.services.settings.get(oauth_token='bar')
+
 
 class TestCallable(unittest.TestCase):
 

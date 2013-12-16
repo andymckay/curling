@@ -44,11 +44,23 @@ def sign_request(slumber, extra=None, headers=None, method=None, params=None,
     auth = req.to_header(realm=extra.get('realm', ''))['Authorization']
     headers['Authorization'] = auth
 
+
 #Make slumber 400 errors show the content.
 def verbose(self, *args, **kw):
     res = super(exceptions.SlumberHttpBaseException, self).__str__(*args, **kw)
     res += '\nContent: %s\n' % getattr(self, 'content', '')
     return res
+
+
+def merge(orig, new):
+    copy = orig.copy() or {}
+    new = new or {}
+    for key in new.keys():
+        if key in orig:
+            raise ValueError('Param conflict: %s exists' % key)
+    copy.update(new)
+    return copy
+
 
 exceptions.SlumberHttpBaseException.__str__ = verbose
 
@@ -145,7 +157,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         Allow a body in GET, because that's just fine.
         """
         s = self._store['serializer']
-
         resp = self._request('GET', data=s.dumps(data) if data else None,
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
@@ -250,7 +261,8 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         for callback in self._store.get('callbacks', []):
             callback['method'](self, data=data, extra=callback.get('extra'),
                                headers=hdrs, method=method,
-                               params=callback.get('params'), url=url)
+                               params=merge(params, callback.get('params')),
+                               url=url)
 
         stats_key = _key(url, method)
         with statsd.timer(stats_key):
@@ -333,6 +345,7 @@ class CurlingBase(object):
         self._store['callbacks'].append(callback_dict)
 
     def activate_oauth(self, key, secret, realm='', params=None):
+        params = params or {}
         self._add_callback({
             'method': sign_request,
             'extra': {'key': key, 'secret': secret, 'realm': realm},
