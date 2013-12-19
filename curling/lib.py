@@ -113,6 +113,14 @@ def default_parser(url):
     return split[1:3], split[3] or None
 
 
+def safe_parser(url):
+    """
+    Takes /blah/blah/some-thing-python-won't-like/ and returns the
+    URL representing it.
+    """
+    return tuple(u for u in url.split('/') if u)
+
+
 def _key(url, method):
     """Produce a standard key for clients like statsd."""
     return '%s.%s' % (

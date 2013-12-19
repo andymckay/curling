@@ -219,3 +219,11 @@ class TestStatsd(unittest.TestCase):
     def test_patch(self):
         self.api.services.settings.patch(data={}, headers={})
         eq_(lib.statsd.cache, {'services.settings.PATCH.200|count': [[1, 1]]})
+
+
+def test_parser():
+    for k, v in [
+        ('/a/b/1', ('a', 'b', '1')),
+        ('/a/b/c/1', ('a', 'b', 'c', '1')),
+        ('/a/b/c/1/', ('a', 'b', 'c', '1'))]:
+        eq_(lib.safe_parser(k), v)
