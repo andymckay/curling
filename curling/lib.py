@@ -118,7 +118,7 @@ def safe_parser(url):
     Takes /blah/blah/some-thing-python-won't-like/ and returns the
     URL representing it.
     """
-    return tuple(u for u in url.split('/') if u)
+    return tuple(u for u in url.split('/') if u), None
 
 
 def _key(url, method):
