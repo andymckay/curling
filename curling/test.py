@@ -223,7 +223,7 @@ class TestStatsd(unittest.TestCase):
 
 def test_parser():
     for k, v in [
-        ('/a/b/1', ('a', 'b', '1')),
-        ('/a/b/c/1', ('a', 'b', 'c', '1')),
-        ('/a/b/c/1/', ('a', 'b', 'c', '1'))]:
+        ('/a/b/1', (('a', 'b', '1'), None)),
+        ('/a/b/c/1', (('a', 'b', 'c', '1'), None)),
+        ('/a/b/c/1/', (('a', 'b', 'c', '1'), None))]:
         eq_(lib.safe_parser(k), v)
