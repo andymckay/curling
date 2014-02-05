@@ -37,10 +37,21 @@ samples = {
             {'key': 'ADMINS'},
         ]
     },
-    'GET:/services/nothing/': {
-        'meta': {},
+    'GET:/services/setting/': {
+        'meta': {'limit': 20, 'total_count': 185},
+        'objects': [
+            {'key': 'ABSOLUTE_URL_OVERRIDES'}
+        ]
+    },
+    'GET:/services/empty/': {
+        'meta': {'limit': 20, 'total_count': 185},
         'objects': []
     },
+    'GET:/unformatted/settings/': [
+        {'key': 'ABSOLUTE_URL_OVERRIDES'},
+        {'key': 'ADMINS'},
+    ],
+    'GET:/unformatted/empty/': [],
     'GET:/services/fatalerror/':
         '<meta name="robots" ...><body>really bad</body>',
 }
@@ -73,20 +84,45 @@ class TestAPI(unittest.TestCase):
         eq_(len(res), 0)
 
     @raises(ObjectDoesNotExist)
-    def test_get_none(self):
-        self.api.services.nothing.get_object()
+    def test_get_empty(self):
+        self.api.services.empty.get_object()
+
+    @raises(MultipleObjectsReturned)
+    def test_get_many(self):
+        self.api.services.settings.get_object()
+
+    def test_get_one(self):
+        print 'test_get_none'
+        eq_(self.api.services.setting.get_object(),
+            {'key': 'ABSOLUTE_URL_OVERRIDES'})
+
+    def test_get_unformatted(self):
+        eq_(self.api.unformatted.settings.get_object(),
+            {'key': 'ABSOLUTE_URL_OVERRIDES'})
+
+    @raises(ObjectDoesNotExist)
+    def test_get_unformatted(self):
+        self.api.unformatted.empty.get_object()
 
     @raises(ObjectDoesNotExist)
     def test_get_404(self):
-        self.api.services.nothing.get_object_or_404()
+        self.api.services.empty.get_object_or_404()
 
     @raises(ObjectDoesNotExist)
     def test_get_list_404(self):
-        self.api.services.nothing.get_list_or_404()
+        self.api.services.empty.get_list_or_404()
 
     def test_get_list_404_works(self):
         res = self.api.services.settings.get_list_or_404()
         eq_(len(res), 2)
+
+    @raises(ObjectDoesNotExist)
+    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    def test_get_404_reraised(self, _call_request):
+        response = mock.Mock()
+        response.status_code = 404
+        _call_request.side_effect = lib.HttpClientError(response=response)
+        self.api.services.empty.get_object_or_404()
 
     @mock.patch('curling.lib.MockTastypieResource._lookup')
     def test_post_decimal(self, lookup):

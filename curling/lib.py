@@ -210,7 +210,12 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         """
         Gets an object and checks that one and only one object is returned.
 
-        Similar to Django get, but called get_object because get is taken.
+        * first it will convert a Tastypie style response into the list of
+          objects.
+        * then it will return the first element unless
+            * if there is more than one element raises MultipleObjectsReturned
+            * if there is less than one element raises ObjectDoesNotExist
+        * if a list is not found but another item, that will be returned
         """
         self.format_lists = True
         res = self.get(**kw)
@@ -224,9 +229,9 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def get_object_or_404(self, **kw):
         """
-        Calls get_object, raises a 404 if the object isn't there.
-
-        Similar to Djangos get_object_or_404.
+        Wrapper around get_object. The only difference is that if the
+        server returns a HTTP 404, this then alters that into an
+        ObjectDoesNotExist error.
         """
         self.format_lists = True
         try:
@@ -235,7 +240,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             if exc.response.status_code == 404:
                 raise ObjectDoesNotExist
             raise
-
 
     def get_list_or_404(self, **kw):
         """
