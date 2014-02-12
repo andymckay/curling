@@ -43,9 +43,10 @@ def sign_request(slumber, extra=None, headers=None, method=None, params=None,
     req.sign_request(oauth.SignatureMethod_HMAC_SHA1(), consumer, None)
     auth = req.to_header(realm=extra.get('realm', ''))['Authorization']
     headers['Authorization'] = auth
+    return headers
 
 
-#Make slumber 400 errors show the content.
+#  Make slumber 400 errors show the content.
 def verbose(self, *args, **kw):
     res = super(exceptions.SlumberHttpBaseException, self).__str__(*args, **kw)
     res += '\nContent: %s\n' % getattr(self, 'content', '')
