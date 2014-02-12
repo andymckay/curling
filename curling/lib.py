@@ -2,7 +2,6 @@ import json
 import time
 import urlparse
 
-from django.conf import settings
 from django.core.exceptions import (ImproperlyConfigured,
                                     MultipleObjectsReturned,
                                     ObjectDoesNotExist)
@@ -130,15 +129,6 @@ def _key(url, method):
 
 class TastypieResource(TastypieAttributesMixin, Resource):
 
-    def __init__(self, *args, **kw):
-        super(TastypieResource, self).__init__(*args, **kw)
-        try:
-            # TODO (andy): remove this from here.
-            self.format_lists = getattr(settings, 'CURLING_FORMAT_LISTS',
-                                        False)
-        except (ImportError, ImproperlyConfigured):
-            self.format_lists = False
-
     def _is_list(self, resp):
         try:
             return set(['meta', 'objects']).issubset(set(resp.keys()))
@@ -156,7 +146,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         resp = super(TastypieResource, self)._try_to_serialize_response(resp)
         if isinstance(resp, dict) and u'meta' in resp:
             resp[u'meta'][u'headers'] = headers
-        if self.format_lists and self._is_list(resp):
+        if self._is_list(resp):
             return self._format_list(resp)
         return resp
 
@@ -217,7 +207,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             * if there is less than one element raises ObjectDoesNotExist
         * if a list is not found but another item, that will be returned
         """
-        self.format_lists = True
         res = self.get(**kw)
         if isinstance(res, list):
             if len(res) < 1:
@@ -233,7 +222,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         server returns a HTTP 404, this then alters that into an
         ObjectDoesNotExist error.
         """
-        self.format_lists = True
         try:
             return self.get_object(**kw)
         except exceptions.HttpClientError, exc:
@@ -247,7 +235,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
         Similar to Djangos get_list_or_404.
         """
-        self.format_lists = True
         res = self.get(**kw)
         if not res:
             raise ObjectDoesNotExist
