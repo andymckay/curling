@@ -6,7 +6,6 @@ from django.conf import settings
 
 minimal = {
     'DATABASES': {'default': {}},
-    'CURLING_FORMAT_LISTS': True,
     # Use the toolbar for tests because it handly caches results for us.
     'STATSD_CLIENT': 'django_statsd.clients.toolbar',
     'STATSD_PREFIX': None,
