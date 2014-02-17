@@ -9,7 +9,7 @@ setup(
     author='Andy McKay',
     author_email='andym@mozilla.com',
     license='BSD',
-    install_requires=['argparse', 'requests>=1.2.0', 'PyJWT-mozilla',
+    install_requires=['argparse', 'requests>=2.0.0', 'PyJWT-mozilla',
                       'mock', 'slumber>=0.5.3', 'Django', 'pygments',
                       'oauth2>=1.5.211', 'httplib2',
                       'django-statsd-mozilla>=0.3.8.6', 'statsd>=1.0.0'],
