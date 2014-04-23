@@ -19,6 +19,7 @@ from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
 from nose.tools import eq_, ok_, raises
 from django_statsd.clients import get_client
+from slumber.exceptions import HttpServerError
 
 import lib
 lib.statsd = get_client()
@@ -28,32 +29,58 @@ from requests.exceptions import ConnectionError
 # Some samples for the Mock.
 samples = {
     'GET:/services/settings/APPEND_SLASH/': {
-        'key': 'APPEND_SLASH'
+        'content': json.dumps({
+            'key': 'APPEND_SLASH'
+        })
     },
     'GET:/services/settings/': {
-        'meta': {'limit': 20, 'total_count': 185},
-        'objects': [
-            {'key': 'ABSOLUTE_URL_OVERRIDES'},
-            {'key': 'ADMINS'},
-        ]
+        'content': json.dumps({
+            'meta': {'limit': 20, 'total_count': 185},
+            'objects': [
+                {'key': 'ABSOLUTE_URL_OVERRIDES'},
+                {'key': 'ADMINS'},
+            ]
+        })
     },
     'GET:/services/setting/': {
-        'meta': {'limit': 20, 'total_count': 185},
-        'objects': [
-            {'key': 'ABSOLUTE_URL_OVERRIDES'}
-        ]
+        'content': json.dumps({
+            'meta': {'limit': 20, 'total_count': 185},
+            'objects': [
+                {'key': 'ABSOLUTE_URL_OVERRIDES'}
+            ]
+        })
+    },
+    'GET:/services/blank/': {
+        'content': None,
+        'status_code': 204
+    },
+    'GET:/services/blankfail/': {
+        'content': json.dumps({'f': 'b'}),
+        'status_code': 204
     },
     'GET:/services/empty/': {
-        'meta': {'limit': 20, 'total_count': 185},
-        'objects': []
+        'content': json.dumps({
+            'meta': {'limit': 20, 'total_count': 185},
+            'objects': []
+        })
     },
-    'GET:/unformatted/settings/': [
-        {'key': 'ABSOLUTE_URL_OVERRIDES'},
-        {'key': 'ADMINS'},
-    ],
-    'GET:/unformatted/empty/': [],
-    'GET:/services/fatalerror/':
-        '<meta name="robots" ...><body>really bad</body>',
+    'GET:/unformatted/settings/': {
+        'content': json.dumps([
+            {'key': 'ABSOLUTE_URL_OVERRIDES'},
+            {'key': 'ADMINS'},
+        ])
+    },
+    'GET:/unformatted/empty/': {
+        'content': json.dumps([])
+    },
+    'GET:/services/fatalerror/': {
+        'content': '<meta name="robots" ...><body>really bad</body>',
+        'content-type': 'text/html'
+    },
+    'PUT:http://foo.com/services/settings/': {},
+    'PATCH:http://foo.com/services/settings/': {},
+    'POST:http://foo.com/services/settings/': {},
+    'GET:http://foo.com/services/settings/': {}
 }
 
 lib.mock_lookup = samples
@@ -79,6 +106,13 @@ class TestAPI(unittest.TestCase):
     def test_get_raises(self):
         self.api.services.settings.get_object()
 
+    def test_get_blank(self):
+        eq_(self.api.services.blank.get(), None)
+
+    @raises(HttpServerError)
+    def test_get_blank_fail(self):
+        self.api.services.blankfail.get()
+
     def test_get_empty(self):
         res = self.api.services.nothing.get()
         eq_(len(res), 0)
@@ -92,7 +126,6 @@ class TestAPI(unittest.TestCase):
         self.api.services.settings.get_object()
 
     def test_get_one(self):
-        print 'test_get_none'
         eq_(self.api.services.setting.get_object(),
             {'key': 'ABSOLUTE_URL_OVERRIDES'})
 
@@ -147,7 +180,7 @@ class TestAPI(unittest.TestCase):
 
     def test_non_dict_is_ignored(self):
         eq_(self.api.services.fatalerror.get(),
-            samples['GET:/services/fatalerror/'])
+            samples['GET:/services/fatalerror/']['content'])
 
 
 class TestOAuth(unittest.TestCase):
