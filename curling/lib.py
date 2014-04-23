@@ -154,6 +154,15 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def _try_to_serialize_response(self, resp):
         headers = resp.headers
+        # 204 specifically does not return any data so we shouldn't try and
+        # parse it.
+        if resp.status_code == 204:
+            if resp.content:
+                raise exceptions.HttpServerError(
+                    'Server Error, not empty: %s' % resp.status_code,
+                    response=resp)
+            return
+
         resp = super(TastypieResource, self)._try_to_serialize_response(resp)
         if isinstance(resp, dict) and u'meta' in resp:
             resp[u'meta'][u'headers'] = headers
@@ -322,8 +331,13 @@ class MockTastypieResource(MockAttributesMixin, TastypieResource):
         resp.headers = {}
         content = mock.Mock()
         content.__iter__ = mock.Mock(return_value=iter([]))
-        resp.content = mock_lookup.get('%s:%s' % (method, url), content)
-        resp.status_code = 200
+        lookup = mock_lookup['%s:%s' % (method, url)]
+        resp.content = json.dumps({})
+        if 'content' in lookup:
+            resp.content = lookup['content']
+        resp.status_code = lookup.get('status_code', 200)
+        resp.headers = {'content-type':
+                        lookup.get('content-type', 'application/json')}
         return resp
 
     def _call_request(self, method, url, data, params, headers):
