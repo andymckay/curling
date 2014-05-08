@@ -290,8 +290,12 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         with statsd.timer(stats_key):
             try:
                 resp = self._call_request(method, url, data, params, hdrs)
-            except ConnectionError:
-                raise exceptions.HttpServerError('Connection Error')
+            except ConnectionError, err:
+                # In the case of connection errors, there isn't a response
+                # so let's explicitly set up to None.
+                raise exceptions.HttpServerError('Connection Error',
+                                                 response=None,
+                                                 content=None)
 
         statsd.incr('%s.%s' % (stats_key, resp.status_code))
         if 400 <= resp.status_code <= 499:
