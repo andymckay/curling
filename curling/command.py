@@ -1,4 +1,5 @@
 import argparse
+import httplib
 import json
 import mimetypes
 import os
@@ -56,6 +57,9 @@ def show_text(data, content_type='text/plain'):
 def new(config):
     url = urlparse.urlparse(config.url)
     api = lib.API('{0}://{1}'.format(url.scheme, url.netloc))
+
+    if config.include:
+        httplib.HTTPConnection.debuglevel = 1
 
     local = get_domain(url.netloc)
     if local:
