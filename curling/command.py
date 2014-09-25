@@ -73,6 +73,8 @@ def new(config):
 
     try:
         res = method(data=config.data)
+        if 'meta' in res:
+            res['meta']['headers'] = dict(res['meta']['headers'])
     except HttpClientError, err:
         res = {
             'status': err.response.status_code,
