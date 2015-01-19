@@ -1,8 +1,11 @@
 language: python
 python:
- - "2.6"
- - "2.7"
+- '2.6'
+- '2.7'
 install: pip install -r requirements/tests.txt
 script: nosetests
 notifications:
-  irc: "irc.mozilla.org#amo-bots"
+  irc: irc.mozilla.org#amo-bots
+deploy:
+  password:
+    secure: YnJh1x71VuGUWpO4YLsuVDgegJuZDkdTsud6zQp4F2Ak5VIvittY9Iqt3To/DmpoGw2CeNV1ji98imWEwQa0CAzmTdCZFDCWFnlylGFYVlKXwa4/Lc1qLDzcx+yawpETdBZcNt3Orc9vNT2TR3k5icOc6gh7dTuuH0CVt+lbv54=

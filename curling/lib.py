@@ -7,7 +7,6 @@ from django.core.exceptions import (ImproperlyConfigured,
                                     MultipleObjectsReturned,
                                     ObjectDoesNotExist)
 
-import mock
 import oauth2 as oauth
 
 try:
@@ -318,37 +317,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
             return response
 
 
-mock_lookup = {}
-
-
-class MockAttributesMixin(TastypieAttributesMixin):
-
-    def __init__(self, *args, **kw):
-        super(MockAttributesMixin, self).__init__(*args, **kw)
-        self._resource = MockTastypieResource
-
-
-class MockTastypieResource(MockAttributesMixin, TastypieResource):
-
-    def _lookup(self, method, url, data=None, params=None, headers=None):
-        resp = mock.Mock()
-        resp.headers = {}
-        content = mock.Mock()
-        content.__iter__ = mock.Mock(return_value=iter([]))
-        lookup = mock_lookup['%s:%s' % (method, url)]
-        resp.content = json.dumps({})
-        if 'content' in lookup:
-            resp.content = lookup['content']
-        resp.status_code = lookup.get('status_code', 200)
-        resp.headers = {'content-type':
-                        lookup.get('content-type', 'application/json')}
-        return resp
-
-    def _call_request(self, method, url, data, params, headers):
-        return self._lookup(method, url, data=data,
-                            params=params, headers=headers)
-
-
 class CurlingBase(object):
 
     def by_url(self, url, parser=None):
@@ -395,9 +363,3 @@ class API(TastypieAttributesMixin, CurlingBase, SlumberAPI):
 
     def __init__(self, *args, **kw):
         return super(API, self).__init__(*args, **make_serializer(**kw))
-
-
-class MockAPI(MockAttributesMixin, CurlingBase, SlumberAPI):
-
-    def __init__(self, *args, **kw):
-        return super(MockAPI, self).__init__(*args, **make_serializer(**kw))

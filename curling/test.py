@@ -86,10 +86,45 @@ samples = {
 lib.mock_lookup = samples
 
 
+class MockAttributesMixin(lib.TastypieAttributesMixin):
+
+    def __init__(self, *args, **kw):
+        super(MockAttributesMixin, self).__init__(*args, **kw)
+        self._resource = MockTastypieResource
+
+
+class MockTastypieResource(MockAttributesMixin, lib.TastypieResource):
+
+    def _lookup(self, method, url, data=None, params=None, headers=None):
+        resp = mock.Mock()
+        resp.headers = {}
+        content = mock.Mock()
+        content.__iter__ = mock.Mock(return_value=iter([]))
+        lookup = lib.mock_lookup['%s:%s' % (method, url)]
+        resp.content = json.dumps({})
+        if 'content' in lookup:
+            resp.content = lookup['content']
+        resp.status_code = lookup.get('status_code', 200)
+        resp.headers = {'content-type':
+                        lookup.get('content-type', 'application/json')}
+        return resp
+
+    def _call_request(self, method, url, data, params, headers):
+        return self._lookup(method, url, data=data,
+                            params=params, headers=headers)
+
+
+class MockAPI(MockAttributesMixin, lib.CurlingBase, lib.SlumberAPI):
+
+    def __init__(self, *args, **kw):
+        return super(MockAPI, self).__init__(
+            *args, **lib.make_serializer(**kw))
+
+
 class TestAPI(unittest.TestCase):
 
     def setUp(self):
-        self.api = lib.MockAPI('')
+        self.api = MockAPI('')
 
     def test_get_one(self):
         eq_(self.api.services.settings('APPEND_SLASH').get_object(),
@@ -150,14 +185,14 @@ class TestAPI(unittest.TestCase):
         eq_(len(res), 2)
 
     @raises(ObjectDoesNotExist)
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    @mock.patch.object(MockTastypieResource, '_call_request')
     def test_get_404_reraised(self, _call_request):
         response = mock.Mock()
         response.status_code = 404
         _call_request.side_effect = lib.HttpClientError(response=response)
         self.api.services.empty.get_object_or_404()
 
-    @mock.patch('curling.lib.MockTastypieResource._lookup')
+    @mock.patch.object(MockTastypieResource, '_lookup')
     def test_post_decimal(self, lookup):
         self.api.services.settings.post({
             'amount': decimal.Decimal('1.0')
@@ -173,7 +208,7 @@ class TestAPI(unittest.TestCase):
         self.assertRaises(IndexError, self.api.by_url, '/')
 
     @raises(lib.HttpServerError)
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    @mock.patch.object(MockTastypieResource, '_call_request')
     def test_connection_error(self, _call_request):
         _call_request.side_effect = ConnectionError
         self.api.services.nothing.get_object()
@@ -183,19 +218,18 @@ class TestAPI(unittest.TestCase):
             samples['GET:/services/fatalerror/']['content'])
 
 
+@mock.patch.object(MockTastypieResource, '_call_request')
 class TestOAuth(unittest.TestCase):
 
     def setUp(self):
-        self.api = lib.MockAPI('http://foo.com')
+        self.api = MockAPI('http://foo.com')
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_none(self, _call_request):
         self.api.services.settings.get()
         _call_request.assert_called_with('GET',
             'http://foo.com/services/settings/', None, {},
             {'content-type': 'application/json', 'accept': 'application/json'})
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_some(self, _call_request):
         self.api.activate_oauth('key', 'secret')
         self.api.services.settings.get()
@@ -203,14 +237,12 @@ class TestOAuth(unittest.TestCase):
             'http://foo.com/services/settings/', None, {}, mock.ANY)
         ok_('OAuth realm=""' in _call_request.call_args[0][4]['Authorization'])
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_realm(self, _call_request):
         self.api.activate_oauth('key', 'secret', realm='r')
         self.api.services.settings.get()
         ok_('OAuth realm="r"' in
             _call_request.call_args[0][4]['Authorization'])
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_query_string(self, _call_request):
         self.api.activate_oauth('key', 'secret')
         self.api.services.settings.get(foo='bar')
@@ -219,7 +251,6 @@ class TestOAuth(unittest.TestCase):
             mock.ANY)
         assert 'oauth_token' not in _call_request.call_args[0][-1]
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_with_params(self, _call_request):
         self.api.activate_oauth('key', 'secret', params={'oauth_token': 'f'})
         self.api.services.settings.get(foo='bar')
@@ -230,17 +261,17 @@ class TestOAuth(unittest.TestCase):
                 _call_request.call_args[0][-1]['Authorization'])
 
     @raises(ValueError)
-    def test_merge_conflict(self):
+    def test_merge_conflict(self, _call_request):
         self.api.activate_oauth('key', 'secret', params={'oauth_token': 'f'})
         self.api.services.settings.get(oauth_token='bar')
 
 
+@mock.patch.object(MockTastypieResource, '_call_request')
 class TestCallable(unittest.TestCase):
 
     def setUp(self):
-        self.api = lib.MockAPI('http://foo.com')
+        self.api = MockAPI('http://foo.com')
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_some(self, _call_request):
         def foo(slumber, headers=None, **kwargs):
             headers['Foo'] = 'bar'
@@ -250,7 +281,6 @@ class TestCallable(unittest.TestCase):
         self.api.services.settings.get()
         ok_('Foo' in _call_request.call_args[0][4])
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
     def test_some_extra(self, _call_request):
         def foo(slumber, headers=None, **kwargs):
             ok_(kwargs['extra'], 'boo')
@@ -262,7 +292,7 @@ class TestCallable(unittest.TestCase):
 class TestStatsd(unittest.TestCase):
 
     def setUp(self):
-        self.api = lib.MockAPI('http://foo.com')
+        self.api = MockAPI('http://foo.com')
         lib.statsd.reset()
 
     def test_get(self):
@@ -270,7 +300,7 @@ class TestStatsd(unittest.TestCase):
         eq_(lib.statsd.cache, {'services.settings.GET.200|count': [[1, 1]]})
         eq_(len(lib.statsd.timings), 1)
 
-    @mock.patch('curling.lib.MockTastypieResource._call_request')
+    @mock.patch.object(MockTastypieResource, '_call_request')
     def test_get_with_etag_header(self, _call_request):
         _call_request.return_value = mock.Mock(status_code=304)
         self.api.services.settings.get(headers={'If-None-Match': 'etag'})
@@ -292,7 +322,7 @@ class TestStatsd(unittest.TestCase):
 
 def test_parser():
     for k, v in [
-        ('/a/b/1', (('a', 'b', '1'), None)),
-        ('/a/b/c/1', (('a', 'b', 'c', '1'), None)),
-        ('/a/b/c/1/', (('a', 'b', 'c', '1'), None))]:
+            ('/a/b/1', (('a', 'b', '1'), None)),
+            ('/a/b/c/1', (('a', 'b', 'c', '1'), None)),
+            ('/a/b/c/1/', (('a', 'b', 'c', '1'), None))]:
         eq_(lib.safe_parser(k), v)
