@@ -54,9 +54,9 @@ def show_text(data, content_type='text/plain'):
         webbrowser.open('file://%s' % name)
 
 
-def new(config):
+def new(config, lib_api=None):
     url = urlparse.urlparse(config.url)
-    api = lib.API('{0}://{1}'.format(url.scheme, url.netloc))
+    api = lib_api or lib.API('{0}://{1}'.format(url.scheme, url.netloc))
 
     if config.include:
         httplib.HTTPConnection.debuglevel = 1
@@ -68,6 +68,13 @@ def new(config):
 
     for path in url.path.split('/'):
         api = getattr(api, path)
+
+    try:
+        if config.data:
+            config.data = json.loads(config.data)
+    except ValueError:
+        print 'Parsing JSON in body failed, request aborted.'
+        return
 
     method = getattr(api, config.request.lower())
 
