@@ -133,12 +133,6 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def __init__(self, *args, **kw):
         super(TastypieResource, self).__init__(*args, **kw)
-        try:
-            # TODO (andy): remove this from here.
-            self.format_lists = getattr(settings, 'CURLING_FORMAT_LISTS',
-                                        False)
-        except (ImportError, ImproperlyConfigured):
-            self.format_lists = False
 
     def _is_list(self, resp):
         try:
