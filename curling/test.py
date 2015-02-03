@@ -21,6 +21,7 @@ from django_statsd.clients import get_client
 from slumber.exceptions import HttpServerError
 
 import lib
+import command
 lib.statsd = get_client()
 
 from requests.exceptions import ConnectionError
@@ -92,25 +93,26 @@ class MockAttributesMixin(lib.TastypieAttributesMixin):
         self._resource = MockTastypieResource
 
 
+def mock_response(method, url, **kw):
+    resp = mock.Mock()
+    resp.headers = {}
+    content = mock.Mock()
+    content.__iter__ = mock.Mock(return_value=iter([]))
+    lookup = lib.mock_lookup['%s:%s' % (method, url)]
+    resp.content = json.dumps({})
+    if 'content' in lookup:
+        resp.content = lookup['content']
+    resp.status_code = lookup.get('status_code', 200)
+    resp.headers = {'content-type':
+                    lookup.get('content-type', 'application/json')}
+    return resp
+
+
 class MockTastypieResource(MockAttributesMixin, lib.TastypieResource):
 
-    def _lookup(self, method, url, data=None, params=None, headers=None):
-        resp = mock.Mock()
-        resp.headers = {}
-        content = mock.Mock()
-        content.__iter__ = mock.Mock(return_value=iter([]))
-        lookup = lib.mock_lookup['%s:%s' % (method, url)]
-        resp.content = json.dumps({})
-        if 'content' in lookup:
-            resp.content = lookup['content']
-        resp.status_code = lookup.get('status_code', 200)
-        resp.headers = {'content-type':
-                        lookup.get('content-type', 'application/json')}
-        return resp
-
     def _call_request(self, method, url, data, params, headers):
-        return self._lookup(method, url, data=data,
-                            params=params, headers=headers)
+        return mock_response(method, url,
+            data=data, params=params, headers=headers)
 
 
 class MockAPI(MockAttributesMixin, lib.CurlingBase, lib.SlumberAPI):
@@ -191,12 +193,12 @@ class TestAPI(unittest.TestCase):
         _call_request.side_effect = lib.HttpClientError(response=response)
         self.api.services.empty.get_object_or_404()
 
-    @mock.patch.object(MockTastypieResource, '_lookup')
-    def test_post_decimal(self, lookup):
+    @mock.patch.object(MockTastypieResource, '_call_request')
+    def test_post_decimal(self, _call_request):
         self.api.services.settings.post({
             'amount': decimal.Decimal('1.0')
         })
-        eq_(json.loads(lookup.call_args[1]['data']), {u'amount': u'1.0'})
+        eq_(json.loads(_call_request.call_args[0][2]), {u'amount': u'1.0'})
 
     def test_by_url(self):
         eq_(len(self.api.by_url('/services/settings/').get()), 2)
@@ -225,14 +227,16 @@ class TestOAuth(unittest.TestCase):
 
     def test_none(self, _call_request):
         self.api.services.settings.get()
-        _call_request.assert_called_with('GET',
+        _call_request.assert_called_with(
+            'GET',
             'http://foo.com/services/settings/', None, {},
             {'content-type': 'application/json', 'accept': 'application/json'})
 
     def test_some(self, _call_request):
         self.api.activate_oauth('key', 'secret')
         self.api.services.settings.get()
-        _call_request.assert_called_with('GET',
+        _call_request.assert_called_with(
+            'GET',
             'http://foo.com/services/settings/', None, {}, mock.ANY)
         ok_('OAuth realm=""' in _call_request.call_args[0][4]['Authorization'])
 
@@ -245,7 +249,8 @@ class TestOAuth(unittest.TestCase):
     def test_query_string(self, _call_request):
         self.api.activate_oauth('key', 'secret')
         self.api.services.settings.get(foo='bar')
-        _call_request.assert_called_with('GET',
+        _call_request.assert_called_with(
+            'GET',
             'http://foo.com/services/settings/', None, {'foo': 'bar'},
             mock.ANY)
         assert 'oauth_token' not in _call_request.call_args[0][-1]
@@ -253,7 +258,8 @@ class TestOAuth(unittest.TestCase):
     def test_with_params(self, _call_request):
         self.api.activate_oauth('key', 'secret', params={'oauth_token': 'f'})
         self.api.services.settings.get(foo='bar')
-        _call_request.assert_called_with('GET',
+        _call_request.assert_called_with(
+            'GET',
             'http://foo.com/services/settings/', None, {'foo': 'bar'},
             mock.ANY)
         assert ('oauth_token="f"' in
@@ -325,3 +331,49 @@ def test_parser():
             ('/a/b/c/1', (('a', 'b', 'c', '1'), None)),
             ('/a/b/c/1/', (('a', 'b', 'c', '1'), None))]:
         eq_(lib.safe_parser(k), v)
+
+
+
+@mock.patch.object(MockTastypieResource, '_call_request')
+class TestCommand(unittest.TestCase):
+
+    def setUp(self):
+        self.url = '/services/settings/'
+        self.api = MockAPI('')
+
+    def setup_config(self, data):
+        cmd = mock.Mock()
+        cmd.url = self.url
+        cmd.request = 'GET'
+        cmd.data = data
+        return cmd
+
+    def correct(self, data):
+        return [
+            'GET',
+            '/services/settings/',
+            data,
+            {},
+            {'content-type': 'application/json', 'accept': 'application/json'}
+        ]
+
+    def test_no_data(self, _call_request):
+        cmd = self.setup_config('')
+        _call_request.return_value = mock_response('GET', self.url)
+        command.new(cmd, lib_api=self.api)
+
+        _call_request.assert_called_with(*self.correct(None))
+
+    def test_some_data(self, _call_request):
+        cmd = self.setup_config('{"foo": "bar"}')
+        _call_request.return_value = mock_response('GET', self.url)
+        command.new(cmd, lib_api=self.api)
+
+        _call_request.assert_called_with(*self.correct('{"foo": "bar"}'))
+
+    def test_invalid_data(self, _call_request):
+        cmd = self.setup_config('{"foo":')
+        _call_request.return_value = mock_response('GET', self.url)
+        command.new(cmd, lib_api=self.api)
+
+        assert not _call_request.called
