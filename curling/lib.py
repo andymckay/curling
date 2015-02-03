@@ -12,7 +12,8 @@ import oauth2 as oauth
 try:
     from django_statsd.clients import statsd
 except (ImportError, ImproperlyConfigured):
-    statsd = mock.MagicMock()
+    from mock import MagicMock
+    statsd = MagicMock()
 
 from requests.exceptions import ConnectionError
 
