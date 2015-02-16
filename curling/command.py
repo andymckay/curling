@@ -6,6 +6,7 @@ import os
 import sys
 import tempfile
 import urlparse
+import sys
 import webbrowser
 
 from pygments import highlight
@@ -71,6 +72,8 @@ def new(config, lib_api=None):
 
     try:
         if config.data:
+            if config.data == '@-':
+                config.data = ''.join(sys.stdin.readlines())
             config.data = json.loads(config.data)
     except ValueError:
         print 'Parsing JSON in body failed, request aborted.'

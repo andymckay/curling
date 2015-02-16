@@ -342,10 +342,10 @@ class TestCommand(unittest.TestCase):
         self.api = MockAPI('')
 
     def setup_config(self, data):
-        cmd = mock.Mock()
-        cmd.url = self.url
-        cmd.request = self.method
-        cmd.data = data if data is not None else ''
+        config = mock.Mock()
+        config.url = self.url
+        config.request = self.method
+        config.data = data if data is not None else ''
 
         content = json.loads(
             samples['%s:%s' % (self.method, self.url)]['content'])
@@ -353,7 +353,7 @@ class TestCommand(unittest.TestCase):
             self.expected = content['objects']
         else:
             self.expected = content
-        return cmd
+        return config
 
     def correct(self, data):
         return [
@@ -366,10 +366,11 @@ class TestCommand(unittest.TestCase):
 
     @mock.patch.object(command, 'show')
     @mock.patch.object(MockTastypieResource, '_call_request')
-    def _test_new_valid(self, _call_request, _show, data=None):
-        cmd = self.setup_config(data)
+    def _test_new_valid(self, _call_request, _show, data=None, config=None):
+        if config is None:
+            config = self.setup_config(data)
         _call_request.return_value = mock_response(self.method, self.url)
-        result = command.new(cmd, lib_api=self.api)
+        result = command.new(config, lib_api=self.api)
 
         _call_request.assert_called_with(*self.correct(data))
         eq_(result, self.expected)
@@ -377,10 +378,11 @@ class TestCommand(unittest.TestCase):
 
     @mock.patch.object(command, 'show')
     @mock.patch.object(MockTastypieResource, '_call_request')
-    def _test_new_invalid(self, _call_request, _show, data=None):
-        cmd = self.setup_config(data)
+    def _test_new_invalid(self, _call_request, _show, data=None, config=None):
+        if config is None:
+            config = self.setup_config(data)
         _call_request.return_value = mock_response(self.method, self.url)
-        result = command.new(cmd, lib_api=self.api)
+        result = command.new(config, lib_api=self.api)
 
         assert not _call_request.called
         eq_(result, None)
@@ -391,8 +393,22 @@ class TestCommand(unittest.TestCase):
     def test_some_data(self):
         self._test_new_valid(data='{"foo": "bar"}')
 
+    @mock.patch.object(command.sys, 'stdin')
+    def test_some_data_stdin(self, _stdin_mock):
+        data = '{"foo": "bar"}'
+        _stdin_mock.readlines.return_value = data
+        config = self.setup_config('@-')
+        self._test_new_valid(data=data, config=config)
+
     def test_invalid_data(self):
         self._test_new_invalid(data='{"foo":')
+
+    @mock.patch.object(command.sys, 'stdin')
+    def test_invalid_data_stdin(self, _stdin_mock):
+        data = '{"foo":'
+        _stdin_mock.readlines.return_value = data
+        config = self.setup_config('@-')
+        self._test_new_invalid(data=data, config=config)
 
     def test_show_dict(self):
         self._test_new_valid()
