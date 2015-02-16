@@ -334,46 +334,69 @@ def test_parser():
 
 
 
-@mock.patch.object(MockTastypieResource, '_call_request')
 class TestCommand(unittest.TestCase):
 
     def setUp(self):
         self.url = '/services/settings/'
+        self.method = 'GET'
         self.api = MockAPI('')
 
     def setup_config(self, data):
         cmd = mock.Mock()
         cmd.url = self.url
-        cmd.request = 'GET'
-        cmd.data = data
+        cmd.request = self.method
+        cmd.data = data if data is not None else ''
+
+        content = json.loads(
+            samples['%s:%s' % (self.method, self.url)]['content'])
+        if isinstance(content, dict):
+            self.expected = content['objects']
+        else:
+            self.expected = content
         return cmd
 
     def correct(self, data):
         return [
-            'GET',
-            '/services/settings/',
+            self.method,
+            self.url,
             data,
             {},
             {'content-type': 'application/json', 'accept': 'application/json'}
         ]
 
-    def test_no_data(self, _call_request):
-        cmd = self.setup_config('')
-        _call_request.return_value = mock_response('GET', self.url)
-        command.new(cmd, lib_api=self.api)
+    @mock.patch.object(command, 'show')
+    @mock.patch.object(MockTastypieResource, '_call_request')
+    def _test_new_valid(self, _call_request, _show, data=None):
+        cmd = self.setup_config(data)
+        _call_request.return_value = mock_response(self.method, self.url)
+        result = command.new(cmd, lib_api=self.api)
 
-        _call_request.assert_called_with(*self.correct(None))
+        _call_request.assert_called_with(*self.correct(data))
+        eq_(result, self.expected)
+        eq_(_show.call_args[0][0], self.expected)
 
-    def test_some_data(self, _call_request):
-        cmd = self.setup_config('{"foo": "bar"}')
-        _call_request.return_value = mock_response('GET', self.url)
-        command.new(cmd, lib_api=self.api)
-
-        _call_request.assert_called_with(*self.correct('{"foo": "bar"}'))
-
-    def test_invalid_data(self, _call_request):
-        cmd = self.setup_config('{"foo":')
-        _call_request.return_value = mock_response('GET', self.url)
-        command.new(cmd, lib_api=self.api)
+    @mock.patch.object(command, 'show')
+    @mock.patch.object(MockTastypieResource, '_call_request')
+    def _test_new_invalid(self, _call_request, _show, data=None):
+        cmd = self.setup_config(data)
+        _call_request.return_value = mock_response(self.method, self.url)
+        result = command.new(cmd, lib_api=self.api)
 
         assert not _call_request.called
+        eq_(result, None)
+
+    def test_no_data(self):
+        self._test_new_valid()
+
+    def test_some_data(self):
+        self._test_new_valid(data='{"foo": "bar"}')
+
+    def test_invalid_data(self):
+        self._test_new_invalid(data='{"foo":')
+
+    def test_show_dict(self):
+        self._test_new_valid()
+
+    def test_show_list(self):
+        self.url = '/unformatted/settings/'
+        self._test_new_valid()

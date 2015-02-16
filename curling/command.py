@@ -91,10 +91,11 @@ def new(config, lib_api=None):
         show(res)
         sys.exit(1)
 
-    if isinstance(res, dict):
+    if isinstance(res, (dict, list)):
         show(res)
     else:
         show_text(res)
+    return res
 
 
 def old(config):
