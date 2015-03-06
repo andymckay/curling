@@ -6,8 +6,8 @@ import os
 import sys
 import tempfile
 import urlparse
-import sys
 import webbrowser
+from collections import OrderedDict
 
 from pygments import highlight
 try:
@@ -80,9 +80,10 @@ def new(config, lib_api=None):
         return
 
     method = getattr(api, config.request.lower())
+    query_dict = OrderedDict(urlparse.parse_qsl(str(url.query)))
 
     try:
-        res = method(data=config.data)
+        res = method(config.data, headers=None, **query_dict)
         if 'meta' in res:
             res['meta']['headers'] = dict(res['meta']['headers'])
     except HttpClientError, err:
@@ -139,5 +140,5 @@ def main():
         new(config)
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     main()

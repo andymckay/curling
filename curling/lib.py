@@ -1,13 +1,13 @@
 import json
-import time
+import urllib
 import urlparse
 
-from django.conf import settings
+from django.conf import settings  # noqa
 from django.core.exceptions import (ImproperlyConfigured,
                                     MultipleObjectsReturned,
                                     ObjectDoesNotExist)
 
-import oauth2 as oauth
+import oauthlib.oauth1
 
 try:
     from django_statsd.clients import statsd
@@ -17,7 +17,6 @@ except (ImportError, ImproperlyConfigured):
 
 from requests.exceptions import ConnectionError
 
-from slumber.exceptions import HttpClientError, HttpServerError  # NOQA
 from slumber import exceptions
 from slumber import API as SlumberAPI, Resource, url_join
 from slumber import serialize
@@ -29,20 +28,22 @@ def sign_request(slumber, extra=None, headers=None, method=None, params=None,
                  url=None, **kwargs):
     if headers is None:
         headers = {}
-    args = {'oauth_consumer_key': extra['key'],
-            'oauth_nonce': oauth.generate_nonce(),
-            'oauth_signature_method': 'HMAC-SHA1',
-            'oauth_timestamp': int(time.time()),
-            'oauth_version': '1.0'}
-    # Update the signed params with the query string params.
+    resource_owner_key = params.pop('oauth_token', None)
+    callback_uri = params.pop('oauth_callback', None)
+    verifier = params.pop('oauth_verifier', None)
     if params:
-        args.update(params)
+        url = '%s?%s' % (url, urllib.urlencode(params))
+    client = oauthlib.oauth1.Client(
+        extra['key'], client_secret=extra['secret'],
+        resource_owner_key=resource_owner_key,
+        callback_uri=callback_uri, verifier=verifier)
+    uri, signed_headers, body = client.sign(
+        url, http_method=method, headers=headers, realm=extra.get('realm', ''))
 
-    req = oauth.Request(method=method, url=url, parameters=args)
-    consumer = oauth.Consumer(extra['key'], extra['secret'])
-    req.sign_request(oauth.SignatureMethod_HMAC_SHA1(), consumer, None)
-    auth = req.to_header(realm=extra.get('realm', ''))['Authorization']
-    headers['Authorization'] = auth
+    # Update headers that was passed in argument, the caller usually don't use
+    # the return value but expects us to have modified the headers passed to
+    # the function.
+    headers.update(signed_headers)
     return headers
 
 
@@ -284,7 +285,7 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         with statsd.timer(stats_key):
             try:
                 resp = self._call_request(method, url, data, params, hdrs)
-            except ConnectionError, err:
+            except ConnectionError:
                 # In the case of connection errors, there isn't a response
                 # so let's explicitly set up to None.
                 raise exceptions.HttpServerError('Connection Error',
@@ -293,13 +294,13 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
         statsd.incr('%s.%s' % (stats_key, resp.status_code))
         if 400 <= resp.status_code <= 499:
-            raise exceptions.HttpClientError("Client Error %s: %s" %
-                    (resp.status_code, url), response=resp,
-                    content=self._try_to_serialize_error(resp))
+            raise exceptions.HttpClientError(
+                "Client Error %s: %s" % (resp.status_code, url),
+                response=resp, content=self._try_to_serialize_error(resp))
         elif 500 <= resp.status_code <= 599:
-            raise exceptions.HttpServerError("Server Error %s: %s" %
-                    (resp.status_code, url), response=resp,
-                    content=self._try_to_serialize_error(resp))
+            raise exceptions.HttpServerError(
+                "Server Error %s: %s" % (resp.status_code, url),
+                response=resp, content=self._try_to_serialize_error(resp))
 
         self._ = resp
 

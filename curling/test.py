@@ -2,29 +2,32 @@ import decimal
 import json
 import unittest
 
-from django.conf import settings
-
-minimal = {
-    'DATABASES': {'default': {}},
-    # Use the toolbar for tests because it handly caches results for us.
-    'STATSD_CLIENT': 'django_statsd.clients.toolbar',
-    'STATSD_PREFIX': None,
-}
-
-if not settings.configured:
-    settings.configure(**minimal)
-
-from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 import mock
+from django.conf import settings
+from django.core.exceptions import MultipleObjectsReturned, ObjectDoesNotExist
 from nose.tools import eq_, ok_, raises
-from django_statsd.clients import get_client
-from slumber.exceptions import HttpServerError
+from requests.exceptions import ConnectionError
+from slumber.exceptions import HttpClientError, HttpServerError
 
 import lib
 import command
-lib.statsd = get_client()
 
-from requests.exceptions import ConnectionError
+
+def configure_settings():
+    if not settings.configured:
+        settings.configure(**{
+            'DATABASES': {'default': {}},
+            # Use the toolbar for tests because it handly caches results for us.
+            'STATSD_CLIENT': 'django_statsd.clients.toolbar',
+            'STATSD_PREFIX': None,
+        })
+
+    from django_statsd.clients import get_client
+    lib.statsd = get_client()
+
+
+configure_settings()
+
 
 # Some samples for the Mock.
 samples = {
@@ -111,8 +114,8 @@ def mock_response(method, url, **kw):
 class MockTastypieResource(MockAttributesMixin, lib.TastypieResource):
 
     def _call_request(self, method, url, data, params, headers):
-        return mock_response(method, url,
-            data=data, params=params, headers=headers)
+        return mock_response(
+            method, url, data=data, params=params, headers=headers)
 
 
 class MockAPI(MockAttributesMixin, lib.CurlingBase, lib.SlumberAPI):
@@ -128,8 +131,8 @@ class TestAPI(unittest.TestCase):
         self.api = MockAPI('')
 
     def test_get_one(self):
-        eq_(self.api.services.settings('APPEND_SLASH').get_object(),
-            samples['GET:/services/settings/APPEND_SLASH/'])
+        eq_(self.api.services.setting.get_object(),
+            {'key': 'ABSOLUTE_URL_OVERRIDES'})
 
     def test_list(self):
         res = self.api.services.settings.get()
@@ -149,28 +152,20 @@ class TestAPI(unittest.TestCase):
     def test_get_blank_fail(self):
         self.api.services.blankfail.get()
 
-    def test_get_empty(self):
-        res = self.api.services.nothing.get()
-        eq_(len(res), 0)
-
     @raises(ObjectDoesNotExist)
     def test_get_empty(self):
         self.api.services.empty.get_object()
+
+    def test_get_empty_get(self):
+        res = self.api.services.empty.get()
+        eq_(len(res), 0)
 
     @raises(MultipleObjectsReturned)
     def test_get_many(self):
         self.api.services.settings.get_object()
 
-    def test_get_one(self):
-        eq_(self.api.services.setting.get_object(),
-            {'key': 'ABSOLUTE_URL_OVERRIDES'})
-
-    def test_get_unformatted(self):
-        eq_(self.api.unformatted.settings.get_object(),
-            {'key': 'ABSOLUTE_URL_OVERRIDES'})
-
     @raises(ObjectDoesNotExist)
-    def test_get_unformatted(self):
+    def test_get_unformatted_empty(self):
         self.api.unformatted.empty.get_object()
 
     @raises(ObjectDoesNotExist)
@@ -190,7 +185,7 @@ class TestAPI(unittest.TestCase):
     def test_get_404_reraised(self, _call_request):
         response = mock.Mock()
         response.status_code = 404
-        _call_request.side_effect = lib.HttpClientError(response=response)
+        _call_request.side_effect = HttpClientError(response=response)
         self.api.services.empty.get_object_or_404()
 
     @mock.patch.object(MockTastypieResource, '_call_request')
@@ -208,7 +203,7 @@ class TestAPI(unittest.TestCase):
     def test_by_url_borked(self):
         self.assertRaises(IndexError, self.api.by_url, '/')
 
-    @raises(lib.HttpServerError)
+    @raises(HttpServerError)
     @mock.patch.object(MockTastypieResource, '_call_request')
     def test_connection_error(self, _call_request):
         _call_request.side_effect = ConnectionError
@@ -238,13 +233,14 @@ class TestOAuth(unittest.TestCase):
         _call_request.assert_called_with(
             'GET',
             'http://foo.com/services/settings/', None, {}, mock.ANY)
-        ok_('OAuth realm=""' in _call_request.call_args[0][4]['Authorization'])
+        authorization = _call_request.call_args[0][4]['Authorization']
+        assert 'OAuth ' in authorization, authorization
 
     def test_realm(self, _call_request):
         self.api.activate_oauth('key', 'secret', realm='r')
         self.api.services.settings.get()
-        ok_('OAuth realm="r"' in
-            _call_request.call_args[0][4]['Authorization'])
+        authorization = _call_request.call_args[0][4]['Authorization']
+        assert 'OAuth ' in authorization, authorization
 
     def test_query_string(self, _call_request):
         self.api.activate_oauth('key', 'secret')
@@ -255,6 +251,17 @@ class TestOAuth(unittest.TestCase):
             mock.ANY)
         assert 'oauth_token' not in _call_request.call_args[0][-1]
 
+        with mock.patch.object(lib.oauthlib.oauth1.Client, 'sign') as _sign:
+            _sign.return_value = 'dummy-url', {}, {}
+            self.api.services.settings.get(foo='bar')
+            _sign.assert_called_with(
+                'http://foo.com/services/settings/?foo=bar',
+                headers={
+                    'content-type': 'application/json',
+                    'accept': 'application/json'},
+                http_method='GET',
+                realm='')
+
     def test_with_params(self, _call_request):
         self.api.activate_oauth('key', 'secret', params={'oauth_token': 'f'})
         self.api.services.settings.get(foo='bar')
@@ -262,8 +269,20 @@ class TestOAuth(unittest.TestCase):
             'GET',
             'http://foo.com/services/settings/', None, {'foo': 'bar'},
             mock.ANY)
-        assert ('oauth_token="f"' in
-                _call_request.call_args[0][-1]['Authorization'])
+        authorization = _call_request.call_args[0][4]['Authorization']
+        assert 'OAuth ' in authorization, authorization
+        assert 'oauth_token="f"' in authorization, authorization
+
+        with mock.patch.object(lib.oauthlib.oauth1.Client, 'sign') as _sign:
+            _sign.return_value = 'dummy-url', {}, {}
+            self.api.services.settings.get(foo='bar')
+            _sign.assert_called_with(
+                'http://foo.com/services/settings/?foo=bar',
+                headers={
+                    'content-type': 'application/json',
+                    'accept': 'application/json'},
+                http_method='GET',
+                realm='')
 
     @raises(ValueError)
     def test_merge_conflict(self, _call_request):
@@ -331,7 +350,6 @@ def test_parser():
             ('/a/b/c/1', (('a', 'b', 'c', '1'), None)),
             ('/a/b/c/1/', (('a', 'b', 'c', '1'), None))]:
         eq_(lib.safe_parser(k), v)
-
 
 
 class TestCommand(unittest.TestCase):
