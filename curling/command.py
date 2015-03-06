@@ -36,10 +36,10 @@ def get_domain(domain):
     return get_config().get(domain)
 
 
-def show(data):
+def show(data, raw=False):
     res = json.dumps(data, indent=2)
-    out = highlight(res, lexer(), Terminal256Formatter(bg='dark'))
-    print out
+    print res if raw else highlight(res, lexer(),
+                                    Terminal256Formatter(bg='dark'))
 
 
 def show_text(data, content_type='text/plain'):
@@ -91,11 +91,11 @@ def new(config, lib_api=None):
             'headers': dict(sorted(err.response.headers.items())),
             'body': err.response.content
         }
-        show(res)
+        show(res, config.raw)
         sys.exit(1)
 
     if isinstance(res, (dict, list)):
-        show(res)
+        show(res, config.raw)
     else:
         show_text(res)
     return res
@@ -118,7 +118,7 @@ def old(config):
 
     ctype = res.headers['content-type'].split(';')[0]
     if res.content and ctype == 'application/json':
-        show(json.loads(res.content))
+        show(json.loads(res.content), config.raw)
         return
 
     show_text(res.content, content_type=ctype)
@@ -130,6 +130,8 @@ def main():
     parser.add_argument('-X', '--request', default='GET', required=False)
     parser.add_argument('-i', '--include', action='store_true', required=False)
     parser.add_argument('-l', '--legacy', action='store_true', required=False)
+    parser.add_argument('-r', '--raw', action='store_true', required=False,
+                        help='Print raw output with no highlighting')
     parser.add_argument('url')
 
     config = parser.parse_args()
