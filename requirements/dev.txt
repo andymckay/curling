@@ -4,7 +4,7 @@ django-statsd-mozilla==0.3.8.6
 httplib2
 mock
 pygments
-oauth2==1.5.211
+oauthlib==0.7.2
 requests>=2.0.0
-slumber==0.5.3
+slumber==0.6.2
 statsd==1.0.0
