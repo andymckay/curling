@@ -169,8 +169,12 @@ class TastypieResource(TastypieAttributesMixin, Resource):
         """
         Allow a body in GET, because that's just fine.
         """
-        s = self._store['serializer']
-        resp = self._request('GET', data=s.dumps(data) if data else None,
+        if data:
+            s = self._store['serializer']
+            data = data if kwargs.get('binary_data') else s.dumps(data)
+        else:
+            data = None
+        resp = self._request('GET', data=data,
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
@@ -181,8 +185,9 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def post(self, data, headers=None, **kwargs):
         s = self._store['serializer']
+        data = data if kwargs.get('binary_data') else s.dumps(data)
 
-        resp = self._request('POST', data=s.dumps(data),
+        resp = self._request('POST', data=data,
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
@@ -192,8 +197,9 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def patch(self, data, headers=None, **kwargs):
         s = self._store['serializer']
+        data = data if kwargs.get('binary_data') else s.dumps(data)
 
-        resp = self._request('PATCH', data=s.dumps(data),
+        resp = self._request('PATCH', data=data,
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)
@@ -203,8 +209,9 @@ class TastypieResource(TastypieAttributesMixin, Resource):
 
     def put(self, data, headers=None, **kwargs):
         s = self._store['serializer']
+        data = data if kwargs.get('binary_data') else s.dumps(data)
 
-        resp = self._request('PUT', data=s.dumps(data),
+        resp = self._request('PUT', data=data,
                              headers=headers, params=kwargs)
         if 200 <= resp.status_code <= 299:
             return self._try_to_serialize_response(resp)

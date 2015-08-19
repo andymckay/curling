@@ -58,6 +58,8 @@ def show_text(data, content_type='text/plain'):
 def new(config, lib_api=None):
     url = urlparse.urlparse(config.url)
     api = lib_api or lib.API('{0}://{1}'.format(url.scheme, url.netloc))
+    binary_data = False
+    headers = {}
 
     if config.include:
         httplib.HTTPConnection.debuglevel = 1
@@ -78,12 +80,25 @@ def new(config, lib_api=None):
     except ValueError:
         print 'Parsing JSON in body failed, request aborted.'
         return
+    if config.data_binary:
+        binary_data = True
+        if config.data:
+            print '--data and --data-binary are mutually exclusive.'
+            return
+        if config.data_binary == '@-':
+            config.data = ''.join(sys.stdin.readlines())
+        else:
+            config.data = config.data_binary
+        headers['content-disposition'] = (
+            'form-data; name="binary_data"; filename="some_binary.data"')
+        headers['content-type'] = 'application/octet-stream'
 
     method = getattr(api, config.request.lower())
     query_dict = OrderedDict(urlparse.parse_qsl(str(url.query)))
 
     try:
-        res = method(config.data, headers=None, **query_dict)
+        res = method(config.data, headers=headers, binary_data=binary_data,
+                     **query_dict)
         if 'meta' in res:
             res['meta']['headers'] = dict(res['meta']['headers'])
     except HttpClientError, err:
@@ -128,6 +143,7 @@ def old(config):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--data', default=None, required=False)
+    parser.add_argument('--data-binary', default=None, required=False)
     parser.add_argument('-X', '--request', default='GET', required=False)
     parser.add_argument('-i', '--include', action='store_true', required=False)
     parser.add_argument('-l', '--legacy', action='store_true', required=False)

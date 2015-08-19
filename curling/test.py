@@ -359,11 +359,12 @@ class TestCommand(unittest.TestCase):
         self.method = 'GET'
         self.api = MockAPI('')
 
-    def setup_config(self, data):
+    def setup_config(self, data=None, binary_data=None):
         config = mock.Mock()
         config.url = self.url
         config.request = self.method
         config.data = data if data is not None else ''
+        config.data_binary = binary_data if binary_data is not None else ''
 
         content = json.loads(
             samples['%s:%s' % (self.method, self.url)]['content'])
@@ -373,20 +374,30 @@ class TestCommand(unittest.TestCase):
             self.expected = content
         return config
 
-    def correct(self, data):
+    def correct(self, data, expected_kwargs=None, expected_headers=None):
+        if expected_kwargs is None:
+            # Use default kwargs if None.
+            expected_kwargs = {
+                'binary_data': False
+            }
+        if expected_headers is None:
+            expected_headers = {
+                'content-type': 'application/json',
+                'accept': 'application/json'
+            }
         return [
             self.method,
             self.url,
             data,
-            {},
-            {'content-type': 'application/json', 'accept': 'application/json'}
+            expected_kwargs,
+            expected_headers
         ]
 
     @mock.patch.object(command, 'show')
     @mock.patch.object(MockTastypieResource, '_call_request')
     def _test_new_valid(self, _call_request, _show, data=None, config=None):
         if config is None:
-            config = self.setup_config(data)
+            config = self.setup_config(data=data)
         _call_request.return_value = mock_response(self.method, self.url)
         result = command.new(config, lib_api=self.api)
 
@@ -398,7 +409,7 @@ class TestCommand(unittest.TestCase):
     @mock.patch.object(MockTastypieResource, '_call_request')
     def _test_new_invalid(self, _call_request, _show, data=None, config=None):
         if config is None:
-            config = self.setup_config(data)
+            config = self.setup_config(data=data)
         _call_request.return_value = mock_response(self.method, self.url)
         result = command.new(config, lib_api=self.api)
 
@@ -415,8 +426,56 @@ class TestCommand(unittest.TestCase):
     def test_some_data_stdin(self, _stdin_mock):
         data = '{"foo": "bar"}'
         _stdin_mock.readlines.return_value = data
-        config = self.setup_config('@-')
+        config = self.setup_config(data='@-')
         self._test_new_valid(data=data, config=config)
+
+    @mock.patch.object(command, 'show')
+    @mock.patch.object(MockTastypieResource, '_call_request')
+    def test_some_binary_data(self, _call_request, _show):
+        data = 'FOOBAR'
+        config = self.setup_config(binary_data='FOOBAR')
+        _call_request.return_value = mock_response(self.method, self.url)
+        result = command.new(config, lib_api=self.api)
+
+        expected_kwargs = {
+            'binary_data': True
+        }
+        expected_headers = {
+            'content-type': 'application/octet-stream',
+            'accept': 'application/json',
+            'content-disposition': 'form-data; name="binary_data"; '
+                                   'filename="some_binary.data"',
+        }
+        _call_request.assert_called_with(*self.correct(
+                data, expected_kwargs=expected_kwargs,
+                expected_headers=expected_headers))
+        eq_(result, self.expected)
+        eq_(_show.call_args[0][0], self.expected)
+
+    @mock.patch.object(command, 'show')
+    @mock.patch.object(MockTastypieResource, '_call_request')
+    @mock.patch.object(command.sys, 'stdin')
+    def test_some_binary_data_stdin(self, _stdin_mock, _call_request, _show):
+        data = 'FOOBAR'
+        _stdin_mock.readlines.return_value = data
+        config = self.setup_config(binary_data='@-')
+        _call_request.return_value = mock_response(self.method, self.url)
+        result = command.new(config, lib_api=self.api)
+
+        expected_kwargs = {
+            'binary_data': True
+        }
+        expected_headers = {
+            'content-type': 'application/octet-stream',
+            'accept': 'application/json',
+            'content-disposition': 'form-data; name="binary_data"; '
+                                   'filename="some_binary.data"',
+        }
+        _call_request.assert_called_with(*self.correct(
+                data, expected_kwargs=expected_kwargs,
+                expected_headers=expected_headers))
+        eq_(result, self.expected)
+        eq_(_show.call_args[0][0], self.expected)
 
     def test_invalid_data(self):
         self._test_new_invalid(data='{"foo":')
@@ -425,7 +484,7 @@ class TestCommand(unittest.TestCase):
     def test_invalid_data_stdin(self, _stdin_mock):
         data = '{"foo":'
         _stdin_mock.readlines.return_value = data
-        config = self.setup_config('@-')
+        config = self.setup_config(data='@-')
         self._test_new_invalid(data=data, config=config)
 
     def test_show_dict(self):
